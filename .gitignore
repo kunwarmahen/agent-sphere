@@ -1,0 +1,17 @@
+agent-sphere-ui/package-lock.json
+.venv/**/* 
+__pycache__/
+*.pyc
+.DS_Store
+env/
+.vscode/
+.idea/
+node_modules/
+dist/
+build/
+*.log
+*.sqlite3
+*.env
+*.egg-info/
+coverage/
+htmlcov/       
