@@ -3,11 +3,11 @@ Workflow Examples - Practical examples of creating and executing workflows
 Shows various patterns and use cases for the workflow system
 """
 
-from workflow_engine import WorkflowEngine, WorkflowTask
-from workflow_templates import WorkflowTemplates
-from home_agent import home_agent
-from calendar_agent import calendar_agent
-from finance_agent import finance_agent
+from workflow.workflow_engine import WorkflowEngine, WorkflowTask
+from workflow.workflow_templates import WorkflowTemplates
+from agents.home_agent import home_agent
+from agents.calendar_agent import calendar_agent
+from agents.finance_agent import finance_agent
 
 
 # Setup engine once

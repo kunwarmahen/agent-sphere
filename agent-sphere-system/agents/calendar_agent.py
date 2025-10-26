@@ -2,9 +2,11 @@
 Calendar & Email Agent - Manage emails, calendar events, and scheduling
 """
 import json
-from agent_framework import Agent, Tool
+import logging
+from base.agent_framework import Agent, Tool
 from datetime import datetime, timedelta
 
+logger = logging.getLogger(__name__)
 
 class CalendarEmailManager:
     """Manages emails and calendar events"""
@@ -132,20 +134,36 @@ class CalendarEmailManager:
     
     def get_calendar_events(self, days_ahead: int = 7) -> str:
         """Get upcoming calendar events"""
-        now = datetime.now()
-        future_cutoff = now + timedelta(days=days_ahead)
-        
-        upcoming = [
-            e for e in self.calendar
-            if datetime.fromisoformat(e["start"]) <= future_cutoff
-        ]
-        
-        upcoming = sorted(upcoming, key=lambda x: x["start"])
-        
-        return json.dumps({
-            "count": len(upcoming),
-            "events": upcoming
-        })
+        try:
+            now = datetime.now()
+            
+            # Handle special case: if days_ahead is 0, return today's events
+            if days_ahead == 0:
+                future_cutoff = now.replace(hour=23, minute=59, second=59)
+            else:
+                future_cutoff = now + timedelta(days=days_ahead)
+            
+            upcoming = [
+                e for e in self.calendar
+                if datetime.fromisoformat(e["start"]) <= future_cutoff and 
+                datetime.fromisoformat(e["start"]) >= now
+            ]
+            
+            upcoming = sorted(upcoming, key=lambda x: x["start"])
+            
+            return json.dumps({
+                "count": len(upcoming),
+                "events": upcoming,
+                "success": True
+            })
+        except Exception as e:
+            logger.error(f"Error getting calendar events: {str(e)}")
+            return json.dumps({
+                "count": 0,
+                "events": [],
+                "success": False,
+                "error": str(e)
+            })
     
     def schedule_event(self, title: str, start_time: str, duration: int, 
                       location: str = "", attendees: list = None, description: str = "") -> str:

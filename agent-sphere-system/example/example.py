@@ -12,7 +12,7 @@ This file shows various patterns for using the multi-agent system.
 
 def example_simple_interaction():
     """Most basic usage - ask agent something and get response"""
-    from home_agent import home_agent
+    from agents.home_agent import home_agent
     
     print("=" * 70)
     print("Example 1: Simple Single-Turn Interaction")
@@ -29,7 +29,7 @@ def example_simple_interaction():
 
 def example_multi_turn_conversation():
     """Agent maintains context across multiple turns"""
-    from calendar_agent import calendar_agent
+    from agents.calendar_agent import calendar_agent
     
     print("\n" + "=" * 70)
     print("Example 2: Multi-Turn Conversation with Memory")
@@ -60,9 +60,9 @@ def example_multi_turn_conversation():
 
 def example_multiple_agents():
     """Coordinate between different agents"""
-    from home_agent import home_agent
-    from calendar_agent import calendar_agent
-    from finance_agent import finance_agent
+    from agents.home_agent import home_agent
+    from agents.calendar_agent import calendar_agent
+    from agents.finance_agent import finance_agent
     
     print("\n" + "=" * 70)
     print("Example 3: Coordinating Multiple Agents")
@@ -101,7 +101,7 @@ def example_multiple_agents():
 
 def example_error_handling():
     """Gracefully handle errors and edge cases"""
-    from home_agent import home_agent
+    from agents.home_agent import home_agent
     
     print("\n" + "=" * 70)
     print("Example 4: Error Handling")
@@ -132,9 +132,9 @@ def example_error_handling():
 
 def example_morning_routine():
     """Complex workflow: Complete morning routine"""
-    from home_agent import home_agent
-    from calendar_agent import calendar_agent
-    from finance_agent import finance_agent
+    from agents.home_agent import home_agent
+    from agents.calendar_agent import calendar_agent
+    from agents.finance_agent import finance_agent
     
     print("\n" + "=" * 70)
     print("Example 5: Complete Morning Routine Workflow")
@@ -185,7 +185,7 @@ def example_morning_routine():
 
 def example_data_analysis():
     """Use agents to analyze and extract data"""
-    from finance_agent import finance_agent
+    from agents.finance_agent import finance_agent
     
     print("\n" + "=" * 70)
     print("Example 6: Financial Analysis and Insights")
@@ -222,7 +222,7 @@ def example_data_analysis():
 
 def example_verbose_mode():
     """See the agent's reasoning process"""
-    from home_agent import home_agent
+    from agents.home_agent import home_agent
     
     print("\n" + "=" * 70)
     print("Example 7: Verbose Mode - See Agent's Reasoning")
@@ -246,7 +246,7 @@ def example_verbose_mode():
 
 def example_custom_tool_integration():
     """Example of how to add custom tools to an agent"""
-    from agent_framework import Agent, Tool
+    from base.agent_framework import Agent, Tool
     
     print("\n" + "=" * 70)
     print("Example 8: Creating Custom Tools and Agent")
@@ -313,7 +313,7 @@ def example_custom_tool_integration():
 
 def example_sequential_tasks():
     """Execute a sequence of related tasks"""
-    from finance_agent import finance_agent
+    from agents.finance_agent import finance_agent
     
     print("\n" + "=" * 70)
     print("Example 9: Sequential Financial Task Execution")
@@ -341,7 +341,7 @@ def example_sequential_tasks():
 
 def example_batch_processing():
     """Process multiple similar requests"""
-    from home_agent import home_agent
+    from agents.home_agent import home_agent
     
     print("\n" + "=" * 70)
     print("Example 10: Batch Processing - Control Multiple Devices")

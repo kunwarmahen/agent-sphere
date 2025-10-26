@@ -1,0 +1,139 @@
+{
+  "name": "Smart Morning Routine",
+  "nodes": [
+    {
+      "id": "node_start",
+      "type": "start",
+      "position": {
+        "x": 250,
+        "y": 50
+      },
+      "data": {
+        "label": "Start"
+      }
+    },
+    {
+      "id": "node_check_calendar",
+      "type": "agent",
+      "position": {
+        "x": 250,
+        "y": 150
+      },
+      "data": {
+        "label": "Check Calendar",
+        "agent": "calendar",
+        "request": "Do I have any meetings in the next 2 hours?"
+      }
+    },
+    {
+      "id": "node_condition",
+      "type": "condition",
+      "position": {
+        "x": 250,
+        "y": 280
+      },
+      "data": {
+        "label": "Has Meeting?",
+        "condition": {
+          "field": "result",
+          "operator": "contains",
+          "value": "meeting"
+        }
+      }
+    },
+    {
+      "id": "node_busy_path",
+      "type": "agent",
+      "position": {
+        "x": 100,
+        "y": 420
+      },
+      "data": {
+        "label": "Prepare Office",
+        "agent": "home",
+        "request": "Turn on office lights to 100% brightness and set temperature to 70 degrees for maximum productivity"
+      }
+    },
+    {
+      "id": "node_relaxed_path",
+      "type": "agent",
+      "position": {
+        "x": 400,
+        "y": 420
+      },
+      "data": {
+        "label": "Relaxed Morning",
+        "agent": "home",
+        "request": "Turn on lights to 60% brightness for a relaxed ambiance and play soft morning music"
+      }
+    },
+    {
+      "id": "node_coffee",
+      "type": "agent",
+      "position": {
+        "x": 250,
+        "y": 560
+      },
+      "data": {
+        "label": "Make Coffee",
+        "agent": "home",
+        "request": "Start the coffee maker and prepare a fresh cup"
+      }
+    },
+    {
+      "id": "node_end",
+      "type": "end",
+      "position": {
+        "x": 250,
+        "y": 680
+      },
+      "data": {
+        "label": "End"
+      }
+    }
+  ],
+  "connections": [
+    {
+      "id": "conn_1",
+      "from": "node_start",
+      "to": "node_check_calendar",
+      "label": ""
+    },
+    {
+      "id": "conn_2",
+      "from": "node_check_calendar",
+      "to": "node_condition",
+      "label": ""
+    },
+    {
+      "id": "conn_3",
+      "from": "node_condition",
+      "to": "node_busy_path",
+      "label": "Yes - Has Meeting"
+    },
+    {
+      "id": "conn_4",
+      "from": "node_condition",
+      "to": "node_relaxed_path",
+      "label": "No - Free Time"
+    },
+    {
+      "id": "conn_5",
+      "from": "node_busy_path",
+      "to": "node_coffee",
+      "label": ""
+    },
+    {
+      "id": "conn_6",
+      "from": "node_relaxed_path",
+      "to": "node_coffee",
+      "label": ""
+    },
+    {
+      "id": "conn_7",
+      "from": "node_coffee",
+      "to": "node_end",
+      "label": ""
+    }
+  ]
+}

@@ -2,7 +2,7 @@
 Financial Planning Agent - Manage budgets, investments, and financial goals
 """
 import json
-from agent_framework import Agent, Tool
+from base.agent_framework import Agent, Tool
 from datetime import datetime, timedelta
 
 

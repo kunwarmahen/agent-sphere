@@ -4,9 +4,9 @@ Scenario: A busy professional's morning routine with multi-agent coordination
 """
 
 import sys
-from home_agent import home_agent, controller as home_controller
-from calendar_agent import calendar_agent, manager as calendar_manager
-from finance_agent import finance_agent, planner as finance_planner
+from agents.home_agent import home_agent, controller as home_controller
+from agents.calendar_agent import calendar_agent, manager as calendar_manager
+from agents.finance_agent import finance_agent, planner as finance_planner
 
 
 class ScenarioDemo:

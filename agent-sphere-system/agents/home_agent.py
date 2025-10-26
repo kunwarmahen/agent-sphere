@@ -2,7 +2,7 @@
 Home Automation Agent - Smart home control with real-time device management
 """
 import json
-from agent_framework import Agent, Tool
+from base.agent_framework import Agent, Tool
 from datetime import datetime
 
 
@@ -100,9 +100,10 @@ class SmartHomeController:
         self.log_action("security", "garage", f"{'opened' if open_garage else 'closed'}")
         return f"Garage is now {'open' if open_garage else 'closed'}"
     
+
     def get_home_status(self) -> str:
         lights_status = {room: light["on"] for room, light in self.lights.items()}
-        devices_status = {device: dev["on"] for device, dev in self.devices.items()}
+        devices_status = {device: {"on": dev["on"]} for device, dev in self.devices.items()}
         
         return json.dumps({
             "lights": lights_status,
@@ -111,10 +112,10 @@ class SmartHomeController:
             "devices": devices_status
         })
     
-    def create_scene(self, scene_name: str, actions: list) -> str:
-        """Create automation scene"""
-        self.automation_rules.append({"scene": scene_name, "actions": actions})
-        return f"Scene '{scene_name}' created with {len(actions)} actions"
+    # def create_scene(self, scene_name: str, actions: list) -> str:
+    #     """Create automation scene"""
+    #     self.automation_rules.append({"scene": scene_name, "actions": actions})
+    #     return f"Scene '{scene_name}' created with {len(actions)} actions"
     
     def activate_scene(self, scene_name: str) -> str:
         """Activate a predefined scene"""
@@ -126,6 +127,127 @@ class SmartHomeController:
     def get_device_log(self, limit: int = 10) -> str:
         """Get recent device actions"""
         return json.dumps(self.device_log[-limit:])
+    
+    def create_scene(self, scene_name: str, actions: list) -> str:
+        """Create an automation scene with predefined actions"""
+        if not hasattr(self, 'scenes'):
+            self.scenes = {}
+        
+        self.scenes[scene_name] = {
+            "name": scene_name,
+            "actions": actions,
+            "created_at": datetime.now().isoformat(),
+            "execution_count": 0
+        }
+        
+        self.log_action("scene_created", scene_name, f"with {len(actions)} actions")
+        return f"Scene '{scene_name}' created with {len(actions)} actions"
+
+
+    def execute_scene(self, scene_name: str) -> str:
+        """Execute a predefined scene"""
+        if not hasattr(self, 'scenes'):
+            return f"Scene '{scene_name}' not found. No scenes created yet."
+        
+        if scene_name not in self.scenes:
+            available = list(self.scenes.keys())
+            return f"Scene '{scene_name}' not found. Available scenes: {available}"
+        
+        scene = self.scenes[scene_name]
+        results = []
+        
+        try:
+            for action_str in scene["actions"]:
+                try:
+                    # Parse and execute the action string
+                    # e.g., "toggle_light(room='bedroom', state=True, brightness=10, color_temp=2700)"
+                    result = self._execute_action_string(action_str)
+                    results.append(f"✓ {result}")
+                except Exception as e:
+                    results.append(f"✗ Error: {str(e)}")
+            
+            scene["execution_count"] += 1
+            self.log_action("scene_executed", scene_name, f"with {len(results)} actions")
+            
+            return f"Scene '{scene_name}' executed:\n" + "\n".join(results)
+        
+        except Exception as e:
+            self.log_action("scene_execution_failed", scene_name, str(e))
+            return f"Error executing scene: {str(e)}"
+
+
+    def _execute_action_string(self, action_str: str) -> str:
+        """Parse and execute an action string"""
+        import re
+        
+        # Parse function call: function_name(param1=value1, param2=value2)
+        match = re.match(r'(\w+)\((.*)\)', action_str.strip())
+        if not match:
+            raise ValueError(f"Invalid action format: {action_str}")
+        
+        function_name = match.group(1)
+        params_str = match.group(2)
+        
+        # Parse parameters
+        params = {}
+        # Handle quoted strings in parameters
+        param_pattern = r"(\w+)=(?:'([^']*)'|\"([^\"]*)\"|(\d+\.?\d*)|(\w+))"
+        
+        for param_match in re.finditer(param_pattern, params_str):
+            key = param_match.group(1)
+            value = (param_match.group(2) or param_match.group(3) or 
+                    param_match.group(4) or param_match.group(5))
+            
+            # Convert to appropriate type
+            if value.lower() in ('true', 'false'):
+                params[key] = value.lower() == 'true'
+            elif value.replace('.', '').isdigit():
+                params[key] = int(value) if '.' not in value else float(value)
+            else:
+                params[key] = value
+        
+        # Execute the function
+        if function_name == "toggle_light":
+            return self.toggle_light(**params)
+        elif function_name == "set_thermostat":
+            return self.set_thermostat(**params)
+        elif function_name == "control_device":
+            return self.control_device(**params)
+        elif function_name == "lock_door":
+            return self.lock_door(**params)
+        elif function_name == "control_garage":
+            return self.control_garage(**params)
+        else:
+            raise ValueError(f"Unknown function: {function_name}")
+
+
+    def get_scenes(self) -> str:
+        """Get all available scenes"""
+        if not hasattr(self, 'scenes'):
+            return json.dumps({"scenes": [], "message": "No scenes created yet"})
+        
+        scenes_list = []
+        for name, scene in self.scenes.items():
+            scenes_list.append({
+                "name": name,
+                "action_count": len(scene["actions"]),
+                "executions": scene["execution_count"],
+                "created_at": scene["created_at"],
+                "actions": scene["actions"]
+            })
+        
+        return json.dumps({"scenes": scenes_list})
+
+
+    def delete_scene(self, scene_name: str) -> str:
+        """Delete a scene"""
+        if not hasattr(self, 'scenes') or scene_name not in self.scenes:
+            return f"Scene '{scene_name}' not found"
+        
+        del self.scenes[scene_name]
+        self.log_action("scene_deleted", scene_name, "")
+        return f"Scene '{scene_name}' deleted"
+
 
 
 # Initialize controller
@@ -168,10 +290,10 @@ home_tools = [
          controller.get_home_status, 
          {}),
     
-    Tool("create_scene", 
-         "Create a new automation scene with predefined actions", 
-         controller.create_scene, 
-         {"scene_name": "str", "actions": "list"}),
+    # Tool("create_scene", 
+    #      "Create a new automation scene with predefined actions", 
+    #      controller.create_scene, 
+    #      {"scene_name": "str", "actions": "list"}),
     
     Tool("activate_scene", 
          "Activate a predefined scene", 
@@ -182,6 +304,26 @@ home_tools = [
          "Get recent device activity log", 
          controller.get_device_log, 
          {"limit": "int (optional)"}),
+
+    Tool("create_scene",
+        "Create an automation scene with multiple actions",
+        controller.create_scene,
+        {"scene_name": "str", "actions": "list of action strings"}),
+
+    Tool("execute_scene",
+        "Execute a previously created scene",
+        controller.execute_scene,
+        {"scene_name": "str"}),
+
+    Tool("get_scenes",
+        "Get all available scenes",
+        controller.get_scenes,
+        {}),
+
+    Tool("delete_scene",
+        "Delete a scene",
+        controller.delete_scene,
+        {"scene_name": "str"}),         
 ]
 
 # Create agent

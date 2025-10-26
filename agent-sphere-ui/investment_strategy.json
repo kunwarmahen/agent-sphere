@@ -1,0 +1,215 @@
+{
+  "name": "Investment Strategy Decision",
+  "nodes": [
+    {
+      "id": "start",
+      "type": "start",
+      "position": {
+        "x": 300,
+        "y": 40
+      },
+      "data": {
+        "label": "Start Analysis"
+      }
+    },
+    {
+      "id": "check_portfolio",
+      "type": "agent",
+      "position": {
+        "x": 300,
+        "y": 140
+      },
+      "data": {
+        "label": "Check Portfolio",
+        "agent": "finance",
+        "request": "What is my current portfolio performance? Show gains and losses"
+      }
+    },
+    {
+      "id": "performance_check",
+      "type": "condition",
+      "position": {
+        "x": 300,
+        "y": 270
+      },
+      "data": {
+        "label": "Profitable?",
+        "condition": {
+          "field": "result",
+          "operator": "contains",
+          "value": "gain"
+        }
+      }
+    },
+    {
+      "id": "profit_analysis",
+      "type": "agent",
+      "position": {
+        "x": 120,
+        "y": 400
+      },
+      "data": {
+        "label": "Profit Taking",
+        "agent": "finance",
+        "request": "Calculate optimal profit taking amount to secure gains"
+      }
+    },
+    {
+      "id": "diversify",
+      "type": "agent",
+      "position": {
+        "x": 120,
+        "y": 520
+      },
+      "data": {
+        "label": "Diversification",
+        "agent": "finance",
+        "request": "Suggest diversification options to spread risk"
+      }
+    },
+    {
+      "id": "rebalance",
+      "type": "agent",
+      "position": {
+        "x": 120,
+        "y": 640
+      },
+      "data": {
+        "label": "Rebalance Portfolio",
+        "agent": "finance",
+        "request": "Generate rebalancing recommendations"
+      }
+    },
+    {
+      "id": "loss_analysis",
+      "type": "agent",
+      "position": {
+        "x": 480,
+        "y": 400
+      },
+      "data": {
+        "label": "Analyze Losses",
+        "agent": "finance",
+        "request": "Analyze reasons for portfolio losses and market conditions"
+      }
+    },
+    {
+      "id": "recovery_strategy",
+      "type": "agent",
+      "position": {
+        "x": 480,
+        "y": 520
+      },
+      "data": {
+        "label": "Recovery Plan",
+        "agent": "finance",
+        "request": "Suggest recovery strategy - hold, average down, or cut losses?"
+      }
+    },
+    {
+      "id": "risk_assessment",
+      "type": "agent",
+      "position": {
+        "x": 480,
+        "y": 640
+      },
+      "data": {
+        "label": "Risk Assessment",
+        "agent": "finance",
+        "request": "Assess current risk exposure and suggest adjustments"
+      }
+    },
+    {
+      "id": "final_report",
+      "type": "agent",
+      "position": {
+        "x": 300,
+        "y": 780
+      },
+      "data": {
+        "label": "Generate Report",
+        "agent": "finance",
+        "request": "Create comprehensive investment strategy report with recommendations"
+      }
+    },
+    {
+      "id": "end",
+      "type": "end",
+      "position": {
+        "x": 300,
+        "y": 900
+      },
+      "data": {
+        "label": "Strategy Complete"
+      }
+    }
+  ],
+  "connections": [
+    {
+      "id": "c1",
+      "from": "start",
+      "to": "check_portfolio",
+      "label": ""
+    },
+    {
+      "id": "c2",
+      "from": "check_portfolio",
+      "to": "performance_check",
+      "label": ""
+    },
+    {
+      "id": "c3",
+      "from": "performance_check",
+      "to": "profit_analysis",
+      "label": "Profitable"
+    },
+    {
+      "id": "c4",
+      "from": "profit_analysis",
+      "to": "diversify",
+      "label": ""
+    },
+    {
+      "id": "c5",
+      "from": "diversify",
+      "to": "rebalance",
+      "label": ""
+    },
+    {
+      "id": "c6",
+      "from": "performance_check",
+      "to": "loss_analysis",
+      "label": "Loss"
+    },
+    {
+      "id": "c7",
+      "from": "loss_analysis",
+      "to": "recovery_strategy",
+      "label": ""
+    },
+    {
+      "id": "c8",
+      "from": "recovery_strategy",
+      "to": "risk_assessment",
+      "label": ""
+    },
+    {
+      "id": "c9",
+      "from": "rebalance",
+      "to": "final_report",
+      "label": ""
+    },
+    {
+      "id": "c10",
+      "from": "risk_assessment",
+      "to": "final_report",
+      "label": ""
+    },
+    {
+      "id": "c11",
+      "from": "final_report",
+      "to": "end",
+      "label": ""
+    }
+  ]
+}

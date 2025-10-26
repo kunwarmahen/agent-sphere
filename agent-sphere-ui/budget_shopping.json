@@ -1,0 +1,158 @@
+{
+  "name": "Budget-Based Shopping",
+  "nodes": [
+    {
+      "id": "start_node",
+      "type": "start",
+      "position": {
+        "x": 250,
+        "y": 30
+      },
+      "data": {
+        "label": "Start Shopping Plan"
+      }
+    },
+    {
+      "id": "check_budget",
+      "type": "agent",
+      "position": {
+        "x": 250,
+        "y": 130
+      },
+      "data": {
+        "label": "Check Budget",
+        "agent": "finance",
+        "request": "How much do I have available in my checking account?"
+      }
+    },
+    {
+      "id": "budget_condition",
+      "type": "condition",
+      "position": {
+        "x": 250,
+        "y": 250
+      },
+      "data": {
+        "label": "Budget > $5000?",
+        "condition": {
+          "field": "result",
+          "operator": "greater_than",
+          "value": "5000"
+        }
+      }
+    },
+    {
+      "id": "high_budget_shopping",
+      "type": "agent",
+      "position": {
+        "x": 80,
+        "y": 380
+      },
+      "data": {
+        "label": "Full Shopping List",
+        "agent": "calendar",
+        "request": "Schedule grocery shopping, electronics store visit, and home goods shopping"
+      }
+    },
+    {
+      "id": "track_high_expense",
+      "type": "agent",
+      "position": {
+        "x": 80,
+        "y": 500
+      },
+      "data": {
+        "label": "Track Expense",
+        "agent": "finance",
+        "request": "Record $500 shopping budget allocation"
+      }
+    },
+    {
+      "id": "low_budget_shopping",
+      "type": "agent",
+      "position": {
+        "x": 420,
+        "y": 380
+      },
+      "data": {
+        "label": "Essential Items Only",
+        "agent": "calendar",
+        "request": "Schedule quick essential grocery run only"
+      }
+    },
+    {
+      "id": "budget_alert",
+      "type": "agent",
+      "position": {
+        "x": 420,
+        "y": 500
+      },
+      "data": {
+        "label": "Budget Review",
+        "agent": "finance",
+        "request": "Review this week's spending and suggest ways to save"
+      }
+    },
+    {
+      "id": "end_node",
+      "type": "end",
+      "position": {
+        "x": 250,
+        "y": 640
+      },
+      "data": {
+        "label": "Shopping Plan Complete"
+      }
+    }
+  ],
+  "connections": [
+    {
+      "id": "c1",
+      "from": "start_node",
+      "to": "check_budget",
+      "label": ""
+    },
+    {
+      "id": "c2",
+      "from": "check_budget",
+      "to": "budget_condition",
+      "label": ""
+    },
+    {
+      "id": "c3",
+      "from": "budget_condition",
+      "to": "high_budget_shopping",
+      "label": "High Budget"
+    },
+    {
+      "id": "c4",
+      "from": "high_budget_shopping",
+      "to": "track_high_expense",
+      "label": ""
+    },
+    {
+      "id": "c5",
+      "from": "budget_condition",
+      "to": "low_budget_shopping",
+      "label": "Low Budget"
+    },
+    {
+      "id": "c6",
+      "from": "low_budget_shopping",
+      "to": "budget_alert",
+      "label": ""
+    },
+    {
+      "id": "c7",
+      "from": "track_high_expense",
+      "to": "end_node",
+      "label": ""
+    },
+    {
+      "id": "c8",
+      "from": "budget_alert",
+      "to": "end_node",
+      "label": ""
+    }
+  ]
+}

@@ -46,15 +46,38 @@ class Agent:
             tools_desc += f"  Parameters: {json.dumps(tool.params)}\n"
         return tools_desc
     
+    def _extract_json_object(self, text: str) -> Optional[Dict]:
+        """Extract JSON object from text by finding matching braces"""
+        try:
+            # Find the first opening brace
+            start_idx = text.find('{')
+            if start_idx == -1:
+                return None
+            
+            # Count braces to find the matching closing brace
+            brace_count = 0
+            for i in range(start_idx, len(text)):
+                if text[i] == '{':
+                    brace_count += 1
+                elif text[i] == '}':
+                    brace_count -= 1
+                    if brace_count == 0:
+                        # Found matching closing brace
+                        json_str = text[start_idx:i+1]
+                        return json.loads(json_str)
+            
+            return None
+        except json.JSONDecodeError as e:
+            print(f"JSON decode error: {e}")
+            return None
+    
     def _parse_action(self, response: str) -> Optional[Dict]:
         """Parse agent's response to extract action"""
-        # Look for JSON action blocks
-        match = re.search(r'\{.*?"action".*?\}', response, re.DOTALL)
-        if match:
-            try:
-                return json.loads(match.group())
-            except json.JSONDecodeError:
-                pass
+        # First, try to extract and parse JSON object with proper brace matching
+        json_obj = self._extract_json_object(response)
+        
+        if json_obj and "action" in json_obj:
+            return json_obj
         
         # Fallback: look for TOOL: name and PARAMS: pattern
         tool_match = re.search(r'TOOL:\s*(\w+)', response)

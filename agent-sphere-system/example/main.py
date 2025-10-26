@@ -7,13 +7,13 @@ Main file that integrates agents, workflows, and workflow templates.
 """
 
 import sys
-from agent_framework import Agent
-from home_agent import home_agent
-from calendar_agent import calendar_agent
-from finance_agent import finance_agent
-from workflow_engine import WorkflowEngine
-from workflow_builder import WorkflowBuilder
-from workflow_templates import WorkflowTemplates
+from base.agent_framework import Agent
+from agents.home_agent import home_agent
+from agents.calendar_agent import calendar_agent
+from agents.finance_agent import finance_agent
+from workflow.workflow_engine import WorkflowEngine
+from workflow.workflow_builder import WorkflowBuilder
+from workflow.workflow_templates import WorkflowTemplates
 
 
 # Setup workflow engine

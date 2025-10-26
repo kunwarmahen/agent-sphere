@@ -1,9 +1,9 @@
 """
-Interactive Workflow Builder - Create workflows through an intuitive CLI interface
+Interactive Workflow Builder - FIXED VERSION with proper task linking
 """
 
 import json
-from workflow_engine import WorkflowEngine, WorkflowTask, Workflow
+from workflow.workflow_engine import WorkflowEngine, WorkflowTask, Workflow
 from typing import Optional, List
 
 
@@ -58,7 +58,7 @@ class WorkflowBuilder:
         self.add_tasks_interactive(workflow)
     
     def add_tasks_interactive(self, workflow: Workflow):
-        """Interactive task addition"""
+        """Interactive task addition with proper linking"""
         self.print_header("ADD TASKS TO WORKFLOW")
         print("\nAvailable agents:")
         print("  • home - Home Automation (JARVIS)")
@@ -66,6 +66,7 @@ class WorkflowBuilder:
         print("  • finance - Financial Planning (FinanceBot)")
         
         task_count = 0
+        previous_task_id = None
         
         while True:
             print(f"\n--- Task {task_count + 1} ---")
@@ -82,6 +83,12 @@ class WorkflowBuilder:
                 continue
             
             task_id = self.get_input(f"Enter task ID (e.g., 'task_{task_count + 1}')")
+            
+            # Check if task_id already exists
+            if task_id in workflow.tasks:
+                print(f"❌ Task ID '{task_id}' already exists. Please use a different ID.")
+                continue
+            
             request = self.get_input("Enter the request for this agent")
             
             retry_count_str = self.get_input(
@@ -91,23 +98,45 @@ class WorkflowBuilder:
             retry_count = int(retry_count_str) if retry_count_str else 1
             
             on_failure = self.get_input(
-                "On failure: 'stop' to halt workflow or 'continue' (default: stop)",
+                "On failure: 'stop' to halt workflow or 'continue' (default: continue)",
                 required=False
-            ).lower() or "stop"
+            ).lower() or "continue"
             
             if on_failure not in ['stop', 'continue']:
-                on_failure = "stop"
+                on_failure = "continue"
             
-            # Add task
+            # Create task
             task = WorkflowTask(task_id, agent_name, request, retry_count, on_failure)
-            workflow.add_task(task)
-            task_count += 1
+            
+            # Link to previous task
+            if previous_task_id and previous_task_id in workflow.tasks:
+                workflow.tasks[previous_task_id].next_task_id = task_id
+                print(f"   ↪ Linked from previous task: {previous_task_id}")
+            
+            # Add task to workflow
+            is_first = task_count == 0
+            workflow.add_task(task, is_start=is_first)
             
             print(f"✅ Task '{task_id}' added!")
+            if is_first:
+                print(f"   (Set as start task)")
+            
+            previous_task_id = task_id
+            task_count += 1
         
         if task_count > 0:
-            print(f"\n✅ Workflow ready! {task_count} tasks added.")
+            print(f"\n✅ Workflow ready! {task_count} tasks added and linked.")
             self.current_workflow = workflow
+            
+            # Show the task chain
+            print(f"\nTask Chain:")
+            current_id = workflow.start_task_id
+            chain = []
+            while current_id:
+                chain.append(current_id)
+                task = workflow.tasks.get(current_id)
+                current_id = task.next_task_id if task else None
+            print(f"  {' → '.join(chain)}")
         else:
             print("\n⚠️  No tasks added to workflow.")
     
@@ -129,15 +158,31 @@ class WorkflowBuilder:
         print(f"Description: {workflow.description}")
         print(f"Status: {workflow.status}")
         print(f"Created: {workflow.created_at.strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"Start Task: {workflow.start_task_id}")
         print(f"\nTasks ({len(workflow.tasks)} total):")
         
-        for i, task in enumerate(workflow.tasks, 1):
-            print(f"\n  {i}. [{task.status.value.upper()}] {task.task_id}")
+        # Show task chain
+        current_id = workflow.start_task_id
+        task_num = 1
+        visited = set()
+        
+        while current_id and current_id not in visited:
+            visited.add(current_id)
+            task = workflow.tasks.get(current_id)
+            if not task:
+                break
+                
+            print(f"\n  {task_num}. [{task.status.value.upper()}] {task.task_id}")
             print(f"     Agent: {task.agent_name}")
             print(f"     Request: {task.request[:60]}..." if len(task.request) > 60 else f"     Request: {task.request}")
             print(f"     Retry: {task.retry_count}, On Failure: {task.on_failure}")
+            if task.next_task_id:
+                print(f"     → Next: {task.next_task_id}")
             if task.result:
                 print(f"     Result: {str(task.result)[:60]}...")
+            
+            current_id = task.next_task_id
+            task_num += 1
     
     def list_workflows(self):
         """List all workflows"""
@@ -156,6 +201,8 @@ class WorkflowBuilder:
             print(f"   Tasks: {w['task_count']} total, {w['completed_tasks']} completed, {w['failed_tasks']} failed")
             if w['duration_seconds']:
                 print(f"   Duration: {w['duration_seconds']:.2f}s")
+            if w.get('execution_path'):
+                print(f"   Path: {' → '.join(w['execution_path'])}")
     
     def execute_workflow_interactive(self, workflow_id: str = None):
         """Execute workflow with confirmation"""
@@ -173,8 +220,19 @@ class WorkflowBuilder:
         self.print_header(f"EXECUTE WORKFLOW: {workflow.name}")
         print(f"\n📋 Workflow Details:")
         print(f"   Tasks: {len(workflow.tasks)}")
-        for task in workflow.tasks:
+        print(f"   Start Task: {workflow.start_task_id}")
+        
+        # Show task chain
+        print(f"\n   Task Chain:")
+        current_id = workflow.start_task_id
+        visited = set()
+        while current_id and current_id not in visited:
+            visited.add(current_id)
+            task = workflow.tasks.get(current_id)
+            if not task:
+                break
             print(f"   • {task.task_id} ({task.agent_name}): {task.request[:50]}...")
+            current_id = task.next_task_id
         
         confirm = input("\n\nProceed with execution? (yes/no): ").lower()
         
@@ -184,8 +242,12 @@ class WorkflowBuilder:
             
             if result["success"]:
                 print("\n✅ Workflow completed successfully!")
+                print(f"   Duration: {result['duration_seconds']:.2f}s")
+                print(f"   Path: {' → '.join(result['execution_path'])}")
             else:
                 print("\n❌ Workflow failed!")
+                if 'error' in result:
+                    print(f"   Error: {result['error']}")
             
             return result
         else:
@@ -212,6 +274,9 @@ class WorkflowBuilder:
         print(f"  ✅ Completed: {status['completed']}/{status['total_tasks']}")
         print(f"  ❌ Failed: {status['failed']}/{status['total_tasks']}")
         print(f"  ⏳ Pending: {status['pending']}/{status['total_tasks']}")
+        if status.get('execution_path'):
+            print(f"\nExecution Path:")
+            print(f"  {' → '.join(status['execution_path'])}")
     
     def view_execution_report(self, workflow_id: str = None):
         """View detailed execution report"""
@@ -231,6 +296,10 @@ class WorkflowBuilder:
         print(f"Success Rate: {report['success_rate']:.1f}%")
         print(f"Total Duration: {report['total_duration_seconds']:.2f}s")
         
+        if report.get('execution_path'):
+            print(f"\nExecution Path:")
+            print(f"  {' → '.join(report['execution_path'])}")
+        
         print(f"\nTask Details:")
         for task in report['tasks']:
             status_icon = "✅" if task['status'] == "completed" else "❌" if task['status'] == "failed" else "⏳"
@@ -238,7 +307,7 @@ class WorkflowBuilder:
             print(f"     Agent: {task['agent']}")
             print(f"     Status: {task['status']}")
             print(f"     Duration: {task['duration_seconds']:.2f}s")
-            print(f"     Attempts: {task['attempts']}/{task.get('retry_count', 1)}")
+            print(f"     Attempts: {task['attempts']}")
             if task['result_preview']:
                 print(f"     Result: {task['result_preview']}...")
             if task['error']:
