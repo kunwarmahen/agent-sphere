@@ -6,6 +6,7 @@ import ToolBuilder from "./components/ToolBuilder";
 import AnalyticsDashboard from "./components/AnalyticsDashboard";
 import TestRunner from "./components/TestRunner";
 import TemplateBrowser from "./components/TemplateBrowser";
+import HomeAutomation from "./components/HomeAutomation";
 
 import "./App.css";
 
@@ -886,9 +887,33 @@ export default function App() {
     try {
       const response = await fetch(`${API_URL}/home/status`);
       const data = await response.json();
-      setHomeStatus(data);
+
+      // Ensure data has required structure
+      const safeData = {
+        lights: data.lights || {},
+        switches: data.switches || {},
+        fans: data.fans || {},
+        thermostat: data.thermostat || { current_temp: 0, target_temp: 0, mode: "off", humidity: 0 },
+        thermostats: data.thermostats || [],  // Array of all thermostats
+        security: data.security || { door_locked: false, garage_open: false, motion_detected: false },
+        devices: data.devices || {},  // Legacy support
+        media_players: data.media_players || {}
+      };
+
+      setHomeStatus(safeData);
     } catch (error) {
       console.error("Error fetching home status:", error);
+      // Set a safe default structure on error
+      setHomeStatus({
+        lights: {},
+        switches: {},
+        fans: {},
+        thermostat: { current_temp: 0, target_temp: 0, mode: "off", humidity: 0 },
+        thermostats: [],
+        security: { door_locked: false, garage_open: false, motion_detected: false },
+        devices: {},
+        media_players: {}
+      });
     }
   };
 
@@ -1033,7 +1058,7 @@ export default function App() {
 
   const toggleDoorLock = async () => {
     try {
-      const newLockState = !homeStatus.security.door_locked;
+      const newLockState = !homeStatus?.security?.door_locked;
       await fetch(`${API_URL}/home/door`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1052,7 +1077,7 @@ export default function App() {
 
   const toggleGarageDoor = async () => {
     try {
-      const newGarageState = !homeStatus.security.garage_open;
+      const newGarageState = !homeStatus?.security?.garage_open;
       await fetch(`${API_URL}/home/garage`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1071,21 +1096,38 @@ export default function App() {
 
   const toggleLight = async (room) => {
     try {
+      // Handle both old format (boolean) and new format (object with 'on' property)
+      const currentState =
+        typeof homeStatus?.lights?.[room] === 'boolean'
+          ? homeStatus.lights[room]
+          : homeStatus?.lights?.[room]?.on || false;
+
       await fetch(`${API_URL}/home/light/${room}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ state: !homeStatus.lights[room] }),
+        body: JSON.stringify({ state: !currentState }),
       });
       fetchHomeStatus();
+
+      const lightName = homeStatus?.lights?.[room]?.name || room.replace("_", " ");
+      showNotification(
+        `${lightName} turned ${!currentState ? "on" : "off"}`,
+        "success"
+      );
     } catch (error) {
       console.error("Error toggling light:", error);
+      showNotification("Failed to toggle light", "error");
     }
   };
 
   const toggleDevice = async (device) => {
     try {
-      // First, get current state
-      const currentState = homeStatus.devices[device].on;
+      // Check if it's in switches, fans, or legacy devices
+      const currentState =
+        homeStatus?.switches?.[device]?.on ||
+        homeStatus?.fans?.[device]?.on ||
+        homeStatus?.devices?.[device]?.on ||
+        false;
 
       await fetch(`${API_URL}/home/device/${device}`, {
         method: "POST",
@@ -1094,10 +1136,14 @@ export default function App() {
       });
 
       fetchHomeStatus();
+
+      const deviceName =
+        homeStatus?.switches?.[device]?.name ||
+        homeStatus?.fans?.[device]?.name ||
+        device.replace("_", " ");
+
       showNotification(
-        `${device.replace("_", " ").toUpperCase()} turned ${
-          !currentState ? "on" : "off"
-        }`,
+        `${deviceName} turned ${!currentState ? "on" : "off"}`,
         "success"
       );
     } catch (error) {
@@ -1106,17 +1152,24 @@ export default function App() {
     }
   };
 
-  const setTemperature = async (temp) => {
+  const setTemperature = async (temp, entityId = null) => {
     try {
       await fetch(`${API_URL}/home/thermostat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ temperature: temp }),
+        body: JSON.stringify({
+          temperature: temp,
+          entity_id: entityId  // Optional: specify which thermostat to control
+        }),
       });
       fetchHomeStatus();
-      showNotification(`Temperature set to ${temp}°F`, "success");
+      const thermostatName = entityId
+        ? homeStatus?.thermostats?.find(t => t.entity_id === entityId)?.name || 'Thermostat'
+        : 'Thermostat';
+      showNotification(`${thermostatName} set to ${temp}°F`, "success");
     } catch (error) {
       console.error("Error setting temperature:", error);
+      showNotification("Failed to set temperature", "error");
     }
   };
 
@@ -2150,15 +2203,26 @@ export default function App() {
           </section>
         )}
         {activeTab === "home" && (
+          <HomeAutomation
+            homeStatus={homeStatus}
+            toggleLight={toggleLight}
+            toggleDevice={toggleDevice}
+            setTemperature={setTemperature}
+            toggleDoorLock={toggleDoorLock}
+            toggleGarageDoor={toggleGarageDoor}
+            loading={loading}
+          />
+        )}
+        {activeTab === "home-old" && (
           <section className="section">
-            <h2>🏠 Home Automation</h2>
+            <h2>🏠 Home Automation (OLD)</h2>
 
             {homeStatus && (
               <div className="home-grid">
                 <div className="home-card">
                   <h3>💡 Lights</h3>
                   <div className="control-group">
-                    {Object.entries(homeStatus.lights).map(([room, status]) => (
+                    {homeStatus?.lights && Object.entries(homeStatus.lights).map(([room, status]) => (
                       <button
                         key={room}
                         className={`light-btn ${status ? "on" : "off"}`}
@@ -2173,27 +2237,55 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="home-card">
-                  <h3>🌡️ Thermostat</h3>
-                  <p>Current: {homeStatus.thermostat.current_temp}°F</p>
-                  <p>Target: {homeStatus.thermostat.target_temp}°F</p>
-                  <p>Mode: {homeStatus.thermostat.mode}</p>
-                  <div className="temp-controls">
-                    {[68, 70, 72, 74, 76].map((temp) => (
-                      <button
-                        key={temp}
-                        className={`temp-btn ${
-                          homeStatus.thermostat.target_temp === temp
-                            ? "active"
-                            : ""
-                        }`}
-                        onClick={() => setTemperature(temp)}
-                      >
-                        {temp}°F
-                      </button>
-                    ))}
+                {/* Show all thermostats if available, otherwise show single thermostat */}
+                {homeStatus?.thermostats && homeStatus.thermostats.length > 0 ? (
+                  homeStatus.thermostats.map((thermostat) => (
+                    <div className="home-card" key={thermostat.entity_id}>
+                      <h3>🌡️ {thermostat.name}</h3>
+                      <p>Current: {thermostat.current_temp || 0}°F</p>
+                      <p>Target: {thermostat.target_temp || 0}°F</p>
+                      <p>Mode: {thermostat.mode || 'off'}</p>
+                      {thermostat.humidity > 0 && (
+                        <p>Humidity: {thermostat.humidity}%</p>
+                      )}
+                      <div className="temp-controls">
+                        {[64, 66, 68, 70, 72, 74, 76].map((temp) => (
+                          <button
+                            key={temp}
+                            className={`temp-btn ${
+                              thermostat.target_temp === temp ? "active" : ""
+                            }`}
+                            onClick={() => setTemperature(temp, thermostat.entity_id)}
+                          >
+                            {temp}°F
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="home-card">
+                    <h3>🌡️ Thermostat</h3>
+                    <p>Current: {homeStatus?.thermostat?.current_temp || 0}°F</p>
+                    <p>Target: {homeStatus?.thermostat?.target_temp || 0}°F</p>
+                    <p>Mode: {homeStatus?.thermostat?.mode || 'off'}</p>
+                    <div className="temp-controls">
+                      {[68, 70, 72, 74, 76].map((temp) => (
+                        <button
+                          key={temp}
+                          className={`temp-btn ${
+                            homeStatus?.thermostat?.target_temp === temp
+                              ? "active"
+                              : ""
+                          }`}
+                          onClick={() => setTemperature(temp)}
+                        >
+                          {temp}°F
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div className="home-card">
                   <h3>🔐 Security</h3>
@@ -2208,20 +2300,20 @@ export default function App() {
                     <button
                       onClick={toggleDoorLock}
                       className={`device-btn ${
-                        homeStatus.security.door_locked ? "on" : "off"
+                        homeStatus?.security?.door_locked ? "on" : "off"
                       }`}
                       style={{ justifyContent: "space-between" }}
                     >
                       <span className="device-name">
-                        {homeStatus.security.door_locked ? "🔒" : "🔓"} Front
+                        {homeStatus?.security?.door_locked ? "🔒" : "🔓"} Front
                         Door
                       </span>
                       <span
                         className={`device-status ${
-                          homeStatus.security.door_locked ? "on" : "off"
+                          homeStatus?.security?.door_locked ? "on" : "off"
                         }`}
                       >
-                        {homeStatus.security.door_locked
+                        {homeStatus?.security?.door_locked
                           ? "Locked"
                           : "Unlocked"}
                       </span>
@@ -2231,19 +2323,19 @@ export default function App() {
                     <button
                       onClick={toggleGarageDoor}
                       className={`device-btn ${
-                        homeStatus.security.garage_open ? "off" : "on"
+                        homeStatus?.security?.garage_open ? "off" : "on"
                       }`}
                       style={{ justifyContent: "space-between" }}
                     >
                       <span className="device-name">
-                        {homeStatus.security.garage_open ? "🚗" : "🚪"} Garage
+                        {homeStatus?.security?.garage_open ? "🚗" : "🚪"} Garage
                       </span>
                       <span
                         className={`device-status ${
-                          homeStatus.security.garage_open ? "off" : "on"
+                          homeStatus?.security?.garage_open ? "off" : "on"
                         }`}
                       >
-                        {homeStatus.security.garage_open ? "Open" : "Closed"}
+                        {homeStatus?.security?.garage_open ? "Open" : "Closed"}
                       </span>
                     </button>
 
@@ -2251,11 +2343,11 @@ export default function App() {
                     <div
                       style={{
                         padding: "0.75rem 1rem",
-                        background: homeStatus.security.motion_detected
+                        background: homeStatus?.security?.motion_detected
                           ? "#fff3cd"
                           : "#d4edda",
                         border: `2px solid ${
-                          homeStatus.security.motion_detected
+                          homeStatus?.security?.motion_detected
                             ? "#ffc107"
                             : "#28a745"
                         }`,
@@ -2266,18 +2358,18 @@ export default function App() {
                       }}
                     >
                       <span style={{ fontWeight: 600, color: "#333" }}>
-                        {homeStatus.security.motion_detected ? "⚠️" : "✅"}{" "}
+                        {homeStatus?.security?.motion_detected ? "⚠️" : "✅"}{" "}
                         Motion Sensor
                       </span>
                       <span
                         style={{
                           fontWeight: 700,
-                          color: homeStatus.security.motion_detected
+                          color: homeStatus?.security?.motion_detected
                             ? "#ff6b00"
                             : "#28a745",
                         }}
                       >
-                        {homeStatus.security.motion_detected
+                        {homeStatus?.security?.motion_detected
                           ? "Motion Detected"
                           : "Clear"}
                       </span>
@@ -2288,7 +2380,7 @@ export default function App() {
                 <div className="home-card">
                   <h3>📺 Devices</h3>
                   <div className="device-list">
-                    {Object.entries(homeStatus.devices).map(
+                    {homeStatus?.devices && Object.entries(homeStatus.devices).map(
                       ([device, status]) => (
                         <button
                           key={device}

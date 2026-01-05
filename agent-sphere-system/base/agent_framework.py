@@ -75,14 +75,14 @@ class Agent:
         """Parse agent's response to extract action"""
         # First, try to extract and parse JSON object with proper brace matching
         json_obj = self._extract_json_object(response)
-        
+
         if json_obj and "action" in json_obj:
             return json_obj
-        
-        # Fallback: look for TOOL: name and PARAMS: pattern
+
+        # Fallback 1: look for TOOL: name and PARAMS: pattern
         tool_match = re.search(r'TOOL:\s*(\w+)', response)
         params_match = re.search(r'PARAMS:\s*({.*?})', response, re.DOTALL)
-        
+
         if tool_match:
             tool_name = tool_match.group(1)
             params = {}
@@ -92,7 +92,27 @@ class Agent:
                 except json.JSONDecodeError:
                     pass
             return {"action": tool_name, "parameters": params}
-        
+
+        # Fallback 2: Parse Python function call syntax
+        # Matches: function_name(param1="value1", param2="value2")
+        func_call_match = re.search(r'(\w+)\((.*?)\)', response)
+        if func_call_match:
+            func_name = func_call_match.group(1)
+            # Only parse if it's one of our known tools
+            if func_name in self.tools:
+                args_str = func_call_match.group(2)
+                params = {}
+
+                # Parse key=value pairs
+                # Handle both key="value" and key='value' formats
+                arg_pattern = r'(\w+)\s*=\s*(["\'])(.*?)\2'
+                for match in re.finditer(arg_pattern, args_str):
+                    param_name = match.group(1)
+                    param_value = match.group(3)
+                    params[param_name] = param_value
+
+                return {"action": func_name, "parameters": params}
+
         return None
     
     def _call_ollama(self, messages: List[Dict]) -> str:
@@ -119,8 +139,17 @@ Your goal is to help the user by using the available tools.
 
 {self._format_tools()}
 
-When you need to use a tool, respond with a JSON block like this:
+CRITICAL: When you need to use a tool, you MUST respond with ONLY a JSON block in this EXACT format:
 {{"action": "tool_name", "parameters": {{"param1": "value1", "param2": "value2"}}}}
+
+DO NOT use Python function syntax like tool_name(param1="value1").
+DO NOT add extra explanation text before or after the JSON.
+ONLY output the JSON when using a tool.
+
+Example - If you need to check the status of a fan:
+{{"action": "get_status", "parameters": {{"entity_id": "fan.master_bedroom_fan"}}}}
+
+After receiving the tool result, provide a clear, natural language response to the user.
 
 Think through the problem step by step. Only output one action at a time.
 After using a tool, wait for the result before deciding the next action."""

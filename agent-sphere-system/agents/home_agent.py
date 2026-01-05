@@ -1,358 +1,191 @@
 """
-Home Automation Agent - Smart home control with real-time device management
+Home Automation Agent - Smart home control with real-time device management via Home Assistant API
 """
 import json
+import logging
 from base.agent_framework import Agent, Tool
 from datetime import datetime
+from typing import List, Any
+# --- NEW IMPORT ---
+# Replace the local manager with the Home Assistant Client
+from agents.homeassistant.home_assistant_api import HomeAssistantClient 
 
+logger = logging.getLogger(__name__)
 
-class SmartHomeController:
-    """Manages all smart home devices and their states"""
-    def __init__(self):
-        self.lights = {
-            "living_room": {"on": False, "brightness": 0, "color_temp": 4000},
-            "bedroom": {"on": False, "brightness": 0, "color_temp": 3000},
-            "kitchen": {"on": False, "brightness": 0, "color_temp": 5000},
-            "bathroom": {"on": False, "brightness": 0, "color_temp": 4000}
-        }
-        self.thermostat = {"current_temp": 72, "target_temp": 72, "mode": "auto", "humidity": 45}
-        self.security = {"door_locked": True, "garage_open": False, "motion_detected": False}
-        self.devices = {
-            "tv": {"on": False, "volume": 0, "input": "hdmi1"},
-            "coffee_maker": {"on": False, "brew_type": "regular"},
-            "washing_machine": {"on": False, "cycle": None},
-            "refrigerator": {"on": False, "temp": 38, "alert": False}
-        }
-        self.automation_rules = []
-        self.device_log = []
+# --- AGENT INITIALIZATION ---
+
+try:
+    # Initialize the Home Assistant Client (This is the actual integration)
+    controller = HomeAssistantClient() 
+except Exception as e:
+    logger.error(f"Failed to initialize HomeAssistantClient: {e}")
+    # Fallback dummy manager if API initialization fails
+    class DummyController:
+        def get_status(self, *args): return "ERROR: Home Assistant API setup failed."
+        def control_device(self, *args): return "ERROR: Home Assistant API setup failed."
+        def create_scene(self, *args): return "Tool Disabled: API Error."
+        def execute_scene(self, *args): return "ERROR: Home Assistant API setup failed."
+        def get_scenes(self): return []
+        def delete_scene(self, *args): return "Tool Disabled: API Error."
+        def get_activity_log(self): return []
     
-    def log_action(self, action: str, device: str, details: str = ""):
-        """Log all device actions"""
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        self.device_log.append({
-            "timestamp": timestamp,
-            "action": action,
-            "device": device,
-            "details": details
-        })
-    
-    def toggle_light(self, room: str, state: bool = None, brightness: int = None, color_temp: int = None) -> str:
-        if room not in self.lights:
-            return f"Room '{room}' not found. Available: {list(self.lights.keys())}"
-        
-        light = self.lights[room]
-        
-        if state is not None:
-            light["on"] = state
-        else:
-            light["on"] = not light["on"]
-        
-        if brightness is not None and 0 <= brightness <= 100:
-            light["brightness"] = brightness if light["on"] else 0
-        
-        if color_temp is not None and 2700 <= color_temp <= 6500:
-            light["color_temp"] = color_temp
-        
-        self.log_action("toggle", room, f"on={light['on']}, brightness={light['brightness']}")
-        
-        status = f"Light in {room} turned {'on' if light['on'] else 'off'}"
-        if light["on"]:
-            status += f" (brightness: {light['brightness']}%, color temp: {light['color_temp']}K)"
-        return status
-    
-    def set_thermostat(self, target_temp: int, mode: str = None) -> str:
-        if not 60 <= target_temp <= 85:
-            return "Temperature must be between 60-85°F"
-        
-        self.thermostat["target_temp"] = target_temp
-        if mode and mode in ["heat", "cool", "auto"]:
-            self.thermostat["mode"] = mode
-        
-        self.log_action("thermostat", "hvac", f"target={target_temp}°F, mode={self.thermostat['mode']}")
-        
-        return f"Thermostat set to {target_temp}°F in {self.thermostat['mode']} mode"
-    
-    def get_thermostat_status(self) -> str:
-        return json.dumps(self.thermostat)
-    
-    def control_device(self, device: str, on: bool = None) -> str:
-        if device not in self.devices:
-            return f"Device '{device}' not found. Available: {list(self.devices.keys())}"
-        
-        dev = self.devices[device]
-        
-        if on is not None:
-            dev["on"] = on
-        else:
-            dev["on"] = not dev["on"]
-        
-        self.log_action("device_control", device, f"state={'on' if dev['on'] else 'off'}")
-        
-        return f"{device.replace('_', ' ').title()} turned {'on' if dev['on'] else 'off'}"
-    
-    def lock_door(self, lock: bool = True) -> str:
-        self.security["door_locked"] = lock
-        self.log_action("security", "door", f"{'locked' if lock else 'unlocked'}")
-        return f"Door is now {'locked' if lock else 'unlocked'}"
-    
-    def control_garage(self, open_garage: bool) -> str:
-        self.security["garage_open"] = open_garage
-        self.log_action("security", "garage", f"{'opened' if open_garage else 'closed'}")
-        return f"Garage is now {'open' if open_garage else 'closed'}"
-    
+    controller = DummyController()
 
-    def get_home_status(self) -> str:
-        lights_status = {room: light["on"] for room, light in self.lights.items()}
-        devices_status = {device: {"on": dev["on"]} for device, dev in self.devices.items()}
-        
-        return json.dumps({
-            "lights": lights_status,
-            "thermostat": self.thermostat,
-            "security": self.security,
-            "devices": devices_status
-        })
-    
-    # def create_scene(self, scene_name: str, actions: list) -> str:
-    #     """Create automation scene"""
-    #     self.automation_rules.append({"scene": scene_name, "actions": actions})
-    #     return f"Scene '{scene_name}' created with {len(actions)} actions"
-    
-    def activate_scene(self, scene_name: str) -> str:
-        """Activate a predefined scene"""
-        for rule in self.automation_rules:
-            if rule["scene"] == scene_name:
-                return f"Scene '{scene_name}' activated with actions: {rule['actions']}"
-        return f"Scene '{scene_name}' not found"
-    
-    def get_device_log(self, limit: int = 10) -> str:
-        """Get recent device actions"""
-        return json.dumps(self.device_log[-limit:])
-    
-    def create_scene(self, scene_name: str, actions: list) -> str:
-        """Create an automation scene with predefined actions"""
-        if not hasattr(self, 'scenes'):
-            self.scenes = {}
-        
-        self.scenes[scene_name] = {
-            "name": scene_name,
-            "actions": actions,
-            "created_at": datetime.now().isoformat(),
-            "execution_count": 0
-        }
-        
-        self.log_action("scene_created", scene_name, f"with {len(actions)} actions")
-        return f"Scene '{scene_name}' created with {len(actions)} actions"
-
-
-    def execute_scene(self, scene_name: str) -> str:
-        """Execute a predefined scene"""
-        if not hasattr(self, 'scenes'):
-            return f"Scene '{scene_name}' not found. No scenes created yet."
-        
-        if scene_name not in self.scenes:
-            available = list(self.scenes.keys())
-            return f"Scene '{scene_name}' not found. Available scenes: {available}"
-        
-        scene = self.scenes[scene_name]
-        results = []
-        
-        try:
-            for action_str in scene["actions"]:
-                try:
-                    # Parse and execute the action string
-                    # e.g., "toggle_light(room='bedroom', state=True, brightness=10, color_temp=2700)"
-                    result = self._execute_action_string(action_str)
-                    results.append(f"✓ {result}")
-                except Exception as e:
-                    results.append(f"✗ Error: {str(e)}")
-            
-            scene["execution_count"] += 1
-            self.log_action("scene_executed", scene_name, f"with {len(results)} actions")
-            
-            return f"Scene '{scene_name}' executed:\n" + "\n".join(results)
-        
-        except Exception as e:
-            self.log_action("scene_execution_failed", scene_name, str(e))
-            return f"Error executing scene: {str(e)}"
-
-
-    def _execute_action_string(self, action_str: str) -> str:
-        """Parse and execute an action string"""
-        import re
-        
-        # Parse function call: function_name(param1=value1, param2=value2)
-        match = re.match(r'(\w+)\((.*)\)', action_str.strip())
-        if not match:
-            raise ValueError(f"Invalid action format: {action_str}")
-        
-        function_name = match.group(1)
-        params_str = match.group(2)
-        
-        # Parse parameters
-        params = {}
-        # Handle quoted strings in parameters
-        param_pattern = r"(\w+)=(?:'([^']*)'|\"([^\"]*)\"|(\d+\.?\d*)|(\w+))"
-        
-        for param_match in re.finditer(param_pattern, params_str):
-            key = param_match.group(1)
-            value = (param_match.group(2) or param_match.group(3) or 
-                    param_match.group(4) or param_match.group(5))
-            
-            # Convert to appropriate type
-            if value.lower() in ('true', 'false'):
-                params[key] = value.lower() == 'true'
-            elif value.replace('.', '').isdigit():
-                params[key] = int(value) if '.' not in value else float(value)
-            else:
-                params[key] = value
-        
-        # Execute the function
-        if function_name == "toggle_light":
-            return self.toggle_light(**params)
-        elif function_name == "set_thermostat":
-            return self.set_thermostat(**params)
-        elif function_name == "control_device":
-            return self.control_device(**params)
-        elif function_name == "lock_door":
-            return self.lock_door(**params)
-        elif function_name == "control_garage":
-            return self.control_garage(**params)
-        else:
-            raise ValueError(f"Unknown function: {function_name}")
-
-
-    def get_scenes(self) -> str:
-        """Get all available scenes"""
-        if not hasattr(self, 'scenes'):
-            return json.dumps({"scenes": [], "message": "No scenes created yet"})
-        
-        scenes_list = []
-        for name, scene in self.scenes.items():
-            scenes_list.append({
-                "name": name,
-                "action_count": len(scene["actions"]),
-                "executions": scene["execution_count"],
-                "created_at": scene["created_at"],
-                "actions": scene["actions"]
-            })
-        
-        return json.dumps({"scenes": scenes_list})
-
-
-    def delete_scene(self, scene_name: str) -> str:
-        """Delete a scene"""
-        if not hasattr(self, 'scenes') or scene_name not in self.scenes:
-            return f"Scene '{scene_name}' not found"
-        
-        del self.scenes[scene_name]
-        self.log_action("scene_deleted", scene_name, "")
-        return f"Scene '{scene_name}' deleted"
-
-
-
-# Initialize controller
-controller = SmartHomeController()
-
-# Create tools
+# Define Tools
 home_tools = [
-    Tool("toggle_light", 
-         "Toggle light on/off in a room, optionally set brightness (0-100) and color temperature (2700-6500K)", 
-         controller.toggle_light, 
-         {"room": "str", "state": "bool (optional)", "brightness": "int (0-100, optional)", "color_temp": "int (2700-6500, optional)"}),
-    
-    Tool("set_thermostat", 
-         "Set target temperature and HVAC mode", 
-         controller.set_thermostat, 
-         {"target_temp": "int (60-85)", "mode": "str (heat/cool/auto, optional)"}),
-    
-    Tool("get_thermostat_status", 
-         "Get current thermostat and temperature status", 
-         controller.get_thermostat_status, 
-         {}),
-    
-    Tool("control_device", 
-         "Turn smart devices on/off (tv, coffee_maker, washing_machine, refrigerator)", 
-         controller.control_device, 
-         {"device": "str", "on": "bool (optional)"}),
-    
-    Tool("lock_door", 
-         "Lock or unlock front door", 
-         controller.lock_door, 
-         {"lock": "bool"}),
-    
-    Tool("control_garage", 
-         "Open or close garage door", 
-         controller.control_garage, 
-         {"open_garage": "bool"}),
-    
-    Tool("get_home_status", 
-         "Get complete status of all home devices", 
-         controller.get_home_status, 
-         {}),
-    
-    # Tool("create_scene", 
-    #      "Create a new automation scene with predefined actions", 
-    #      controller.create_scene, 
-    #      {"scene_name": "str", "actions": "list"}),
-    
-    Tool("activate_scene", 
-         "Activate a predefined scene", 
-         controller.activate_scene, 
-         {"scene_name": "str"}),
-    
-    Tool("get_device_log", 
-         "Get recent device activity log", 
-         controller.get_device_log, 
-         {"limit": "int (optional)"}),
+    Tool("get_status",
+         "Get the current state and attributes of a specific device entity (e.g., 'light.living_room_light') or 'all' devices.",
+         controller.get_status,
+         {"entity_id": "str (optional, Home Assistant entity ID, e.g., 'light.living_room_light', defaults to 'all')"}),
 
-    Tool("create_scene",
-        "Create an automation scene with multiple actions",
-        controller.create_scene,
-        {"scene_name": "str", "actions": "list of action strings"}),
+    Tool("control_device",
+         "Send a service call command to control a device. REQUIRED for all control operations (turn on/off, set temperature, etc.). Examples: control lights, thermostats, locks, switches.",
+         controller.control_device,
+         {"entity_id": "str (required, e.g., 'climate.thermostat_2' for upstairs thermostat, 'light.bedroom' for bedroom light)",
+          "domain": "str (required, entity type: 'climate' for thermostats, 'light' for lights, 'lock' for locks, 'switch' for switches)",
+          "service": "str (required, action: 'set_temperature' for thermostats, 'turn_on'/'turn_off' for lights/switches, 'lock'/'unlock' for locks)",
+          "service_data": "dict (optional, extra params as dict, e.g., {'temperature': 72} for thermostats, {'brightness_pct': 50} for lights)"}),
 
     Tool("execute_scene",
-        "Execute a previously created scene",
+        "Execute a Home Assistant Scene or Script entity.",
         controller.execute_scene,
-        {"scene_name": "str"}),
+        {"scene_entity_id": "str (required, e.g., 'scene.good_night', 'script.morning_routine')"}),
 
     Tool("get_scenes",
-        "Get all available scenes",
+        "Get all available Scene and Script entity IDs.",
         controller.get_scenes,
         {}),
-
-    Tool("delete_scene",
-        "Delete a scene",
-        controller.delete_scene,
-        {"scene_name": "str"}),         
+        
+    Tool("get_activity_log",
+         "Fetches recent device activity history.",
+         controller.get_activity_log,
+         {}),
 ]
 
 # Create agent
 home_agent = Agent(
-    name="JARVIS",
-    role="Home Automation Manager",
+    name="Home Assistant Agent",
+    role="Home Assistant Control Manager",
     tools=home_tools,
-    system_instructions="You are a smart home assistant. Help users control their home efficiently. When controlling multiple devices, do it step by step."
+    system_instructions="""You are a smart home assistant connected to the Home Assistant REST API.
+
+CRITICAL INSTRUCTIONS:
+1. When the user asks you to CONTROL a device (turn on, turn off, set temperature, etc.), you MUST use the 'control_device' tool, NOT just 'get_status'.
+2. Use 'get_status' ONLY to check current state, not to control devices.
+3. When responding to status queries, provide CONCISE, NATURAL LANGUAGE answers. Never dump raw JSON to the user!
+
+4. CRITICAL - Exact Entity IDs (use these EXACT strings):
+   LIGHTS:
+   - Stairs Light: light.lights (NOT light.stairs or light.stair)
+   - Living Room: light.living_room_lights
+   - Kitchen: light.kitchen_lights
+   - Master Bedroom: light.master_bedroom_lights
+   - Drawing Room: light.drawingroom_lights
+   - Guest Room: light.guestroom_lights
+   - Piano Light: light.piano_light_socket
+   - Under Cabinet: light.under_cabinet_lights_socket
+
+   FANS:
+   - Living Room Fan: fan.living_room_fan
+   - Guest Room Fan: fan.guest_room_fan
+   - Purple Room Fan: fan.purple_room_fan
+   - Orange Room Fan: fan.orange_room_fan
+   - Master Bedroom Fan: fan.master_bedroom_fan
+
+   SWITCHES:
+   - Washer: switch.washer_power
+   - Dryer: switch.dryer_power
+   - Fountain: switch.fountain_socket
+   - Fountain Light: switch.fountain_light_socket
+   - Fireplace: switch.fireplace_socket
+
+   THERMOSTATS:
+   - Downstairs: climate.thermostat
+   - Upstairs: climate.thermostat_2
+
+5. For status queries (e.g., "is the master bedroom fan on?"):
+   STEP 1: Identify the exact entity_id from the list above
+   STEP 2: Use get_status(entity_id="fan.master_bedroom_fan") with the SPECIFIC entity
+   STEP 3: Parse the response and give a simple answer like "Yes, the master bedroom fan is on" or "No, it's off"
+
+   DO NOT use get_status(entity_id="all") for simple status queries! Only use "all" when you truly don't know the entity ID.
+
+6. When you don't know the exact entity ID:
+   STEP 1: Use get_status(entity_id="all") to list all entities
+   STEP 2: Find the entity with matching friendly_name
+   STEP 3: Use that EXACT entity_id in your control command
+   STEP 4: Provide a CONCISE summary to the user, not the raw JSON dump!
+
+7. Always execute the command when asked - don't just report what you see!
+
+To control a thermostat:
+   - Use control_device with domain="climate", service="set_temperature", service_data={"temperature": XX}
+   - For "upstairs" thermostat, use entity_id="climate.thermostat_2"
+   - For "downstairs" thermostat, use entity_id="climate.thermostat"
+
+To control a fan:
+   - Use control_device with domain="fan", service="turn_on" or "turn_off"
+   - To set speed: service="turn_on", service_data={"percentage": XX} (0-100)
+
+EXAMPLES:
+
+STATUS QUERIES (checking state):
+User: "Is the master bedroom fan on?"
+→ get_status(entity_id="fan.master_bedroom_fan")
+→ Response: "Yes, the master bedroom fan is currently on" (or "No, it's off")
+
+User: "What's the temperature upstairs?"
+→ get_status(entity_id="climate.thermostat_2")
+→ Response: "The upstairs thermostat is currently 72°F with a target of 70°F"
+
+CONTROL COMMANDS (changing state):
+User: "Set upstairs thermostat to 72"
+→ control_device(entity_id="climate.thermostat_2", domain="climate", service="set_temperature", service_data={"temperature": 72})
+
+User: "Turn on bedroom light"
+→ control_device(entity_id="light.master_bedroom_lights", domain="light", service="turn_on")
+
+User: "Turn off stairs light"
+→ control_device(entity_id="light.lights", domain="light", service="turn_off")
+   (Note: It's light.lights, NOT light.stairs!)
+
+User: "Turn on the washer"
+→ control_device(entity_id="switch.washer_power", domain="switch", service="turn_on")
+
+User: "Turn on the master bedroom fan"
+→ control_device(entity_id="fan.master_bedroom_fan", domain="fan", service="turn_on")
+
+User: "Turn on office light" (unknown entity)
+→ STEP 1: get_status(entity_id="all") to find the entity
+→ STEP 2: Search for "office" in friendly names
+→ STEP 3: control_device with the found entity_id
+"""
 )
 
 
 if __name__ == "__main__":
     # Test home automation
-    print("=" * 70)
-    print("HOME AUTOMATION AGENT - Interactive Demo")
+    print("\n" + "=" * 70)
+    print("HOME ASSISTANT AGENT - Interactive Demo (ACTUAL API IMPLEMENTATION)")
     print("=" * 70)
     
+    # --- NOTE: You MUST change 'light.kitchen' and 'climate.home_thermostat' to your actual entity IDs ---
     test_requests = [
-        "What's the current status of my home?",
-        "Turn on the living room lights with 80% brightness",
-        "Set the temperature to 75 degrees in cooling mode",
-        "Turn on the coffee maker and TV",
-        "Lock the door and close the garage",
-        "Show me recent device activity"
+        "What's the status of all my devices?",
+        "Turn on the kitchen light with 80% brightness",
+        "Set the thermostat to 72 degrees in cool mode",
+        "Execute the 'scene.good_night' scene",
     ]
+    
+    # Example control parameters for the LLM to choose:
+    # "Turn on the kitchen light with 80% brightness" -> 
+    #   control_device(entity_id="light.kitchen", domain="light", service="turn_on", service_data={"brightness_pct": 80})
+    # "Set the thermostat to 72 degrees in cool mode" -> 
+    #   control_device(entity_id="climate.home_thermostat", domain="climate", service="set_hvac_mode", service_data={"hvac_mode": "cool"}) AND 
+    #   control_device(entity_id="climate.home_thermostat", domain="climate", service="set_temperature", service_data={"temperature": 72})
     
     for request in test_requests:
         print(f"\nUser: {request}")
         print("-" * 70)
-        result = home_agent.think_and_act(request, verbose=False)
-        print(f"Agent: {result}\n")
-        home_agent.clear_memory()
+        result = home_agent.think_and_act(request, verbose=True)
+        print(f"\nAgent Final Response: {result}")

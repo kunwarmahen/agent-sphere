@@ -284,14 +284,16 @@ def control_thermostat():
         data = request.json
         temperature = data.get('temperature')
         mode = data.get('mode')
-        
-        result = home_controller.set_thermostat(temperature, mode)
-        
+        entity_id = data.get('entity_id')  # Optional: specific thermostat to control
+
+        result = home_controller.set_thermostat(temperature, mode, entity_id)
+
         broadcast_update('home_update', {
             'type': 'thermostat',
-            'temperature': temperature
+            'temperature': temperature,
+            'entity_id': entity_id
         })
-        
+
         return jsonify({"message": result}), 200
     except Exception as e:
         logger.error(f"Error controlling thermostat: {str(e)}")
