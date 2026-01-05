@@ -14,5 +14,11 @@ build/
 *.env
 *.egg-info/
 coverage/
-htmlcov/       
+htmlcov/
 .env
+
+# Google OAuth credentials - DO NOT COMMIT
+credentials.json
+token.json
+**/credentials.json
+**/token.json
