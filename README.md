@@ -1,28 +1,47 @@
-# Multi-Agent AI System from Scratch
+# Multi-Agent AI System
 
-A complete AI agent framework built without external agent frameworks. Features three specialized agents for home automation, calendar/email management, and financial planning, powered by **Ollama Qwen2.5:14b**.
+A complete AI agent framework with web UI for home automation, calendar/email management, and financial planning, powered by **Ollama Qwen2.5:14b**.
 
 ## 🎯 Overview
 
-This project demonstrates:
+This project features:
 
 - **Core Agent Framework** - Reasoning loop with tool usage
-- **Three Specialized Agents** - Home, Calendar, Finance
-- **Real-World Scenarios** - Multi-agent coordination
-- **No External Frameworks** - Pure Python implementation
+- **Three Specialized Agents** - Home Assistant, Google Calendar/Gmail, Finance
+- **Real API Integrations** - Home Assistant, Google Calendar, Gmail
+- **Web UI Dashboard** - React-based interface
+- **REST API Server** - Flask backend with WebSocket support
 - **Local LLM Integration** - Ollama-based reasoning
+- **Workflow Engine** - Multi-agent task coordination
 
 ## 📁 Project Structure
 
 ```
-agent-sphere-system/
-├── agent_framework.py      # Core Agent & Tool classes
-├── home_agent.py          # Home automation agent (JARVIS)
-├── calendar_agent.py      # Calendar & email agent (Assistant)
-├── finance_agent.py       # Financial planning agent (FinanceBot)
-├── demo_scenario.py       # Real-world scenario demonstrations
-├── main.py               # Interactive CLI entry point
-└── README.md            # This file
+agent-sphere/
+├── agent-sphere-system/          # Backend Python application
+│   ├── base/
+│   │   ├── agent_framework.py    # Core Agent & Tool classes
+│   │   └── api_server.py         # Flask REST API server
+│   ├── agents/
+│   │   ├── home_agent.py         # Home Assistant integration
+│   │   ├── google/
+│   │   │   ├── google_auth.py    # Google OAuth handler
+│   │   │   ├── gmail_agent.py    # Gmail API integration
+│   │   │   ├── google_calendar_agent.py  # Calendar API integration
+│   │   │   └── google_unified_agent.py   # Combined Gmail + Calendar
+│   │   ├── finance_agent.py      # Financial planning agent
+│   │   └── custom_agents.py      # Custom agent builder
+│   ├── workflow/                 # Workflow engine
+│   ├── analytics/                # Analytics tracking
+│   ├── testing/                  # Agent testing framework
+│   └── templates/                # Agent templates
+│
+└── agent-sphere-ui/              # Frontend React application
+    ├── src/
+    │   ├── App.jsx               # Main application
+    │   ├── components/           # React components
+    │   └── App.css              # Styles
+    └── package.json
 ```
 
 ## ⚙️ Installation
@@ -30,329 +49,381 @@ agent-sphere-system/
 ### Prerequisites
 
 - Python 3.8+
-- Ollama running locally with Qwen2.5:14b model
-- requests library
+- Node.js 16+ and npm
+- Ollama with Qwen2.5:14b model
+- Home Assistant instance (optional)
+- Google Cloud Platform account (for Calendar/Gmail)
 
 ### Step 1: Install Ollama
 
 Download from [ollama.ai](https://ollama.ai)
 
-### Step 2: Pull Qwen Model
-
 ```bash
 ollama pull qwen2.5:14b
-```
-
-### Step 3: Start Ollama Service
-
-```bash
 ollama serve
 ```
 
-Keep this running in the background. It starts a server on `http://localhost:11434`
+Keep Ollama running in the background on `http://localhost:11434`
 
-### Step 4: Install Python Dependencies
-
-```bash
-pip install requests
-```
-
-## 🚀 Quick Start
-
-### Option 1: Interactive Mode
+### Step 2: Install Backend Dependencies
 
 ```bash
-python main.py
+cd agent-sphere-system
+pip install -r requirements.txt
 ```
 
-Then select an agent to interact with. Type your requests in natural language!
+**Required packages:**
+- flask
+- flask-cors
+- flask-socketio
+- google-auth
+- google-auth-oauthlib
+- google-api-python-client
+- requests
+- python-dotenv
 
-### Option 2: Run Scenarios
+### Step 3: Install Frontend Dependencies
 
 ```bash
-python demo_scenario.py
+cd agent-sphere-ui
+npm install
 ```
 
-Shows real-world multi-agent coordination in action.
+## 🔧 Configuration
 
-### Option 3: Test Individual Agents
+### Home Assistant Setup
+
+1. Get your Home Assistant URL and create a Long-Lived Access Token:
+   - Go to your Home Assistant → Profile → Long-Lived Access Tokens
+   - Click "Create Token"
+   - Copy the token
+
+2. Create `.env` file in `agent-sphere-system/`:
 
 ```bash
-# Test home automation
-python home_agent.py
-
-# Test calendar & email
-python calendar_agent.py
-
-# Test financial planning
-python finance_agent.py
+HA_BASE_URL=http://your-home-assistant:8123/api
+HA_ACCESS_TOKEN=your_long_lived_access_token_here
 ```
 
-## 🏠 Home Automation Agent (JARVIS)
+### Google Calendar & Gmail Setup
+
+1. **Create Google Cloud Project:**
+   - Go to [Google Cloud Console](https://console.cloud.google.com/)
+   - Create new project
+   - Enable APIs: Google Calendar API, Gmail API
+
+2. **Create OAuth Credentials:**
+   - Go to "APIs & Services" → "Credentials"
+   - Click "Create Credentials" → "OAuth client ID"
+   - Application type: "Desktop app"
+   - Download the JSON file
+
+3. **Configure Credentials:**
+   - Rename downloaded file to `credentials.json`
+   - Place in `agent-sphere-system/` directory
+   - **DO NOT commit this file to git** (already in .gitignore)
+
+4. **First-time OAuth Flow:**
+   - On first run, a browser window will open
+   - Sign in with your Google account
+   - Grant permissions for Calendar and Gmail access
+   - A `token.json` file will be created automatically
+   - **DO NOT commit token.json to git**
+
+### Environment Variables (Optional)
+
+Create `agent-sphere-system/.env`:
+
+```bash
+# Home Assistant
+HA_BASE_URL=http://localhost:8123/api
+HA_ACCESS_TOKEN=your_token_here
+
+# Ollama (defaults shown)
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=qwen2.5:14b
+```
+
+## 🚀 Running the Application
+
+### Start Backend Server
+
+```bash
+cd agent-sphere-system
+python -m base.api_server
+```
+
+Server runs on `http://localhost:5000`
+
+**API Endpoints:**
+- `/api/agents/<agent_id>/chat` - Chat with agents
+- `/api/home/status` - Home automation status
+- `/api/calendar/events` - Calendar events
+- `/api/calendar/emails` - Gmail messages
+- `/api/workflows/execute` - Run workflows
+
+### Start Frontend UI
+
+```bash
+cd agent-sphere-ui
+npm start
+```
+
+UI opens at `http://localhost:3000`
+
+### Access the Dashboard
+
+Open browser to `http://localhost:3000` and you'll see:
+
+- 🏠 **Home Automation** - Control lights, thermostats, fans, switches
+- 📅 **Calendar & Email** - View events, read/send emails
+- 💰 **Finance** - Budget tracking and financial planning
+- 🔧 **Workflows** - Multi-agent task automation
+- 🤖 **Custom Agents** - Build your own agents
+- 📊 **Analytics** - Usage metrics and performance
+
+## 🏠 Home Assistant Agent
 
 **Capabilities:**
 
-- 🔦 Control lights (on/off, brightness, color temperature)
-- 🌡️ Manage thermostat (temperature, heating/cooling mode)
-- 🔐 Security (lock/unlock doors, garage control)
-- 📺 Smart device control (TV, coffee maker, washing machine)
-- 📊 Home status reports
-- 🎬 Automation scenes
+- Control lights (on/off, brightness)
+- Manage thermostats (temperature, mode)
+- Control fans (on/off, speed)
+- Manage switches
+- View real-time device status
+
+**Supported Entities:**
+- `light.*` - Smart lights
+- `climate.*` - Thermostats
+- `fan.*` - Fans
+- `switch.*` - Switches
+- `lock.*` - Smart locks
+- `cover.*` - Garage doors
 
 **Example Requests:**
 
 ```
-"Turn on the living room lights with 80% brightness"
-"Set thermostat to 72 degrees in cooling mode"
-"Lock the door and close the garage"
-"Turn on coffee maker and TV"
-"Show me the current home status"
+"Turn on the living room lights"
+"Set upstairs thermostat to 72 degrees"
+"Is the master bedroom fan on?"
+"Turn off all lights in the kitchen"
 ```
 
-## 📅 Calendar & Email Agent (Assistant)
+**Entity Mapping:**
+
+The agent uses specific entity IDs. Check `agents/home_agent.py` for your entity mappings or use:
+
+```
+"Get status of all devices"  # Lists all entities with their IDs
+```
+
+## 📅 Calendar & Email Agent
 
 **Capabilities:**
 
-- 📧 Read and manage emails
-- 📨 Send emails with CC/BCC
-- 📅 View calendar events
-- 🗓️ Schedule new events
-- ⏰ Reschedule existing events
-- 🔍 Find free time slots
-- 📝 Reply to emails
+- Read unread emails from Gmail
+- Send emails via Gmail
+- View upcoming calendar events
+- Schedule new events
+- Check busy/free times
 
 **Example Requests:**
 
 ```
-"Show me my unread emails"
-"What's on my calendar for the next 3 days?"
-"When am I free for a 1-hour meeting?"
-"Schedule a team meeting tomorrow at 2 PM"
-"Send an email to alice@company.com about the project update"
+"Do I have any unread emails?"
+"What's on my calendar today?"
+"Schedule a meeting called 'Review' tomorrow at 2pm for 30 minutes"
+"Send an email to john@example.com about the project update"
 ```
 
-## 💰 Financial Planning Agent (FinanceBot)
+**Important Notes:**
+
+- Event times must include timezone: `2026-01-06T14:00:00-05:00`
+- Email IDs are strings, not integers
+- First run requires OAuth authentication in browser
+
+## 💰 Financial Planning Agent
 
 **Capabilities:**
 
-- 💳 Account balance tracking
-- 💸 Transaction recording
-- 📊 Spending analysis by category
-- 📈 Investment portfolio management
-- 🎯 Financial goals tracking
-- 💡 Savings projections
-- 💳 Budget monitoring
+- Track account balances
+- Record transactions
+- Analyze spending by category
+- Monitor budget
+- Track financial goals
 
 **Example Requests:**
 
 ```
 "What's my financial summary?"
-"Show me my spending analysis for the last month"
-"How are my investments performing?"
-"Add $500 to my vacation fund"
-"If I save $600/month, where will I be in 2 years?"
+"Show me spending analysis"
+"Add $100 expense for groceries"
+"How much have I saved for vacation?"
 ```
 
-## 🔄 Agent Architecture
+## 🔄 Multi-Agent Workflows
 
-### Tool Class
+Create workflows that coordinate multiple agents:
 
-```python
-tool = Tool(
-    name="toggle_light",
-    description="Turn lights on/off",
-    func=toggle_light_function,
-    params={"room": "str", "state": "bool"}
-)
-```
-
-### Agent Loop
-
-1. **Receive** - Get user request
-2. **Think** - Call LLM with system prompt and tools
-3. **Decide** - Parse LLM response for tool calls
-4. **Act** - Execute selected tool
-5. **Reflect** - Add results to memory, continue or finish
-
-### Real Ollama Integration
-
-```python
-# The system automatically calls your local Ollama instance
-response = requests.post(
-    "http://localhost:11434/api/chat",
-    json={
-        "model": "qwen2.5:14b",
-        "messages": messages,
-        "stream": False
+```json
+{
+  "name": "Morning Routine",
+  "tasks": [
+    {
+      "agent": "home",
+      "action": "Turn on kitchen lights"
+    },
+    {
+      "agent": "calendar",
+      "action": "What's on my calendar today?"
+    },
+    {
+      "agent": "finance",
+      "action": "Show me yesterday's spending"
     }
-)
+  ]
+}
 ```
 
-## 📚 Real-World Scenarios
+## 🤖 Custom Agents
 
-### Scenario 1: Morning Routine
+Build your own agents via the UI:
 
-Agent coordinates home automation and calendar to get you ready for the day.
-
-### Scenario 2: Financial Planning
-
-Month-end financial review with spending analysis and goal progress.
-
-### Scenario 3: Busy Day Management
-
-Complex multi-task coordination across all three agents.
-
-### Scenario 4: Emergency Response
-
-High-paced scenario requiring rapid multi-agent coordination.
-
-## 🛠️ Extending the System
-
-### Add a New Tool
-
-```python
-def my_custom_function(param1: str, param2: int) -> str:
-    return f"Result: {param1} with {param2}"
-
-new_tool = Tool(
-    name="my_tool",
-    description="Does something custom",
-    func=my_custom_function,
-    params={"param1": "str", "param2": "int"}
-)
-
-agent.tools["my_tool"] = new_tool
-```
-
-### Create a New Agent
-
-```python
-from agent_framework import Agent, Tool
-
-# Create tools
-my_tools = [tool1, tool2, tool3]
-
-# Create agent
-my_agent = Agent(
-    name="MyAgent",
-    role="Specific Role",
-    tools=my_tools,
-    system_instructions="Custom instructions..."
-)
-
-# Use it
-response = my_agent.think_and_act("Your request here")
-```
-
-### Integration with Real APIs
-
-Replace the `_call_ollama` method in `agent_framework.py`:
-
-```python
-def _call_ollama(self, messages: List[Dict]) -> str:
-    # Use OpenAI, Claude, or any other LLM API
-    response = openai.ChatCompletion.create(
-        model="gpt-4",
-        messages=messages
-    )
-    return response.choices[0].message.content
-```
-
-## 🔍 How Reasoning Works
-
-1. **System Prompt** - Agent gets its role, available tools, and instructions
-2. **Memory** - Conversation history maintains context
-3. **LLM Reasoning** - Qwen2.5:14b decides which tool to use
-4. **Tool Parsing** - System extracts action and parameters
-5. **Execution** - Tool is executed with given parameters
-6. **Feedback Loop** - Result added to memory for next iteration
-
-## ⚡ Performance Tips
-
-- **Model Size**: Qwen2.5:14b is fast enough for real-time use
-- **Timeout**: 120 seconds for complex reasoning
-- **Memory**: Agents maintain full conversation history
-- **Parallel**: Multiple agents can run simultaneously
+1. Go to "Custom Agents" tab
+2. Click "Create New Agent"
+3. Define name, role, and system instructions
+4. Select tools from available tool library
+5. Test and publish
 
 ## 🐛 Troubleshooting
 
 ### "Cannot connect to Ollama"
 
-- Make sure `ollama serve` is running
-- Check that Qwen model is downloaded: `ollama list`
-- Verify localhost:11434 is accessible
+- Ensure `ollama serve` is running
+- Check `http://localhost:11434` is accessible
+- Verify Qwen2.5:14b is installed: `ollama list`
 
-### Agent gives wrong responses
+### Home Assistant not working
 
-- Increase iterations: `agent.max_iterations = 15`
-- Add more specific system instructions
-- Check tool definitions are clear
+- Check `HA_BASE_URL` in `.env`
+- Verify access token is valid
+- Test: `curl -H "Authorization: Bearer YOUR_TOKEN" http://your-ha:8123/api/states`
 
-### Slow responses
+### Google Calendar/Gmail errors
 
-- Qwen2.5:14b needs 8GB+ VRAM
-- Reduce `max_iterations`
-- Use smaller model if needed
+**"insufficientPermissions" (403 error):**
+1. Delete `token.json`
+2. Update scopes in `agents/google/google_auth.py` if needed
+3. Restart backend to trigger OAuth re-authentication
+4. Grant all requested permissions
 
-## 📖 Example Usage
+**"credentials.json not found":**
+- Download OAuth credentials from Google Cloud Console
+- Save as `credentials.json` in `agent-sphere-system/`
 
-```python
-from home_agent import home_agent
+### Frontend not loading data
 
-# Single query
-response = home_agent.think_and_act("Turn on living room lights")
-print(response)
+- Check backend is running on port 5000
+- Check browser console for CORS errors
+- Verify API endpoints in browser: `http://localhost:5000/api/home/status`
 
-# Multi-turn conversation
-home_agent.think_and_act("What's my home status?")
-home_agent.think_and_act("Set temperature to 75")
-home_agent.think_and_act("Lock the door")
+### Agent not understanding requests
 
-# Clear memory for fresh conversation
-home_agent.clear_memory()
+- Increase `max_iterations` in `agent_framework.py`
+- Check system instructions in agent definition
+- Verify tool descriptions are clear
+- View agent reasoning with `verbose=True`
+
+## 🔐 Security Notes
+
+**Never commit these files:**
+- `credentials.json` - OAuth client credentials
+- `token.json` - Access tokens for your Google account
+- `.env` - Home Assistant tokens and API keys
+
+These are already in `.gitignore`.
+
+**OAuth Scopes:**
+- `https://www.googleapis.com/auth/calendar` - Full calendar access
+- `https://www.googleapis.com/auth/gmail.readonly` - Read emails
+- `https://www.googleapis.com/auth/gmail.send` - Send emails
+
+## 📚 API Documentation
+
+### Chat with Agent
+
+```bash
+POST /api/agents/home/chat
+{
+  "message": "Turn on living room lights"
+}
 ```
 
-## 🎓 Learning Outcomes
+### Get Home Status
 
-This project teaches:
+```bash
+GET /api/home/status
+```
 
-- AI agent architecture and design patterns
-- Tool calling and function execution
-- LLM integration and prompt engineering
-- State management in agents
-- Multi-agent coordination
-- Error handling and recovery
+### Get Calendar Events
+
+```bash
+GET /api/calendar/events?days=7
+```
+
+### Get Emails
+
+```bash
+GET /api/calendar/emails?limit=10&unread_only=true
+```
+
+## 🎓 Development
+
+### Adding New Tools
+
+```python
+from base.agent_framework import Tool
+
+def my_custom_tool(param1: str) -> str:
+    return f"Result: {param1}"
+
+new_tool = Tool(
+    name="my_tool",
+    description="Does something useful",
+    func=my_custom_tool,
+    params={"param1": "str (required)"}
+)
+
+agent.tools["my_tool"] = new_tool
+```
+
+### Adding New Agents
+
+See `agents/custom_agents.py` for the custom agent framework.
+
+### Modifying UI
+
+React components are in `agent-sphere-ui/src/components/`
+
+### Testing
+
+```bash
+# Test individual agents
+python agents/home_agent.py
+python agents/google/google_unified_agent.py
+python agents/finance_agent.py
+```
 
 ## 📝 License
 
 Open source - feel free to modify and extend!
 
-## 🤝 Contributing
-
-Ideas for extensions:
-
-- Add weather API integration
-- Implement persistent database storage
-- Create web UI dashboard
-- Add voice input/output
-- Build mobile app
-- Implement agent-to-agent communication
-
-## 📞 Support
-
-For issues or questions:
-
-1. Check the troubleshooting section
-2. Verify Ollama is running
-3. Review agent tool definitions
-4. Check system memory and resources
-
 ## 🚀 Next Steps
 
-1. **Customize** - Add your own tools and agents
-2. **Integrate** - Connect to real APIs (Gmail, Google Calendar, banking APIs)
-3. **Deploy** - Create web interface with Flask/FastAPI
-4. **Monitor** - Add logging and performance metrics
-5. **Scale** - Run multiple agents in parallel
+1. Configure your Home Assistant integration
+2. Set up Google Calendar/Gmail OAuth
+3. Build custom agents for your use cases
+4. Create workflows to automate daily tasks
+5. Extend with additional API integrations
 
 Enjoy building! 🎉
