@@ -18,8 +18,8 @@ from datetime import datetime
 
 from base.agent_framework import Agent
 from agents.home_agent import home_agent, controller as home_controller
-# from agents.calendar_agent import calendar_agent, manager as calendar_manager
-from agents.google.google_calendar_agent import calendar_agent,  calendar_manager
+from agents.calendar_agent import calendar_agent, manager as calendar_manager
+# from agents.google.google_calendar_agent import calendar_agent,  calendar_manager
 # from agents.google.gmail_agent import gmail_agent as calendar_agent,  gmail_manager as calendar_manager
 from agents.finance_agent import finance_agent, planner as finance_planner
 from agents.custom_agents import custom_agent_manager
