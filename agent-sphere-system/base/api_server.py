@@ -9,6 +9,8 @@ import whisper
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
+from flask_limiter import Limiter
+
 from typing import Dict, Any
 import json
 import logging
@@ -16,7 +18,9 @@ from datetime import datetime
 
 from base.agent_framework import Agent
 from agents.home_agent import home_agent, controller as home_controller
-from agents.calendar_agent import calendar_agent, manager as calendar_manager
+# from agents.calendar_agent import calendar_agent, manager as calendar_manager
+from agents.google.google_calendar_agent import calendar_agent,  calendar_manager
+# from agents.google.gmail_agent import gmail_agent as calendar_agent,  gmail_manager as calendar_manager
 from agents.finance_agent import finance_agent, planner as finance_planner
 from agents.custom_agents import custom_agent_manager
 from tools.dynamic_tools import dynamic_tool_builder
@@ -25,6 +29,12 @@ from agents.planning_agent import create_llm_orchestrator
 from workflow.workflow_engine import WorkflowEngine, WorkflowTask
 from workflow.workflow_templates import WorkflowTemplates
 from werkzeug.utils import secure_filename
+
+from store.config import Config
+from store.storage_backends import get_storage_backend
+from analytics.analytics import agent_analytics, ExecutionTimer
+from testing.testing import agent_tester, TestCase
+from templates.templates import agent_template_library
 
 
 # Initialize Flask app
@@ -62,6 +72,9 @@ notification_history = []
 
 # Load Whisper model once at startup (change 'base' to 'small', 'medium', 'large' for better accuracy)
 whisper_model = whisper.load_model("base")
+
+# Initialize rate limiter
+limiter = Limiter(app, default_limits=["200 per day", "50 per hour"])
 
 UPLOAD_FOLDER = tempfile.gettempdir()
 ALLOWED_EXTENSIONS = {'wav', 'mp3', 'm4a', 'ogg', 'flac', 'webm'}
@@ -1155,162 +1168,165 @@ def get_tool_details(tool_name):
 
 
 @app.route('/api/agents/custom/<agent_id>/chat', methods=['POST'])
+@limiter.limit("30 per minute")
 def custom_agent_chat(agent_id):
-    """Chat with a custom agent and automatically execute its tools"""
-    try:
-        data = request.json
-        message = data.get('message', '').strip()
-        
-        if not message:
-            return jsonify({"error": "Message is required"}), 400
-        
-        logger.info(f"[CUSTOM AGENT CHAT] Agent {agent_id} received message: {message}")
-        
-        agent_data = custom_agent_manager.get_agent(agent_id)
-        if not agent_data:
-            return jsonify({"error": f"Agent '{agent_id}' not found"}), 404
-        
-        # Get agent's custom tools
-        agent_tools = agent_data.get('tools', [])
-        custom_tool_ids = [t for t in agent_tools if t.startswith('custom_') or len(t) == 8]
-        
-        response = ""
-        
-        # If agent has custom tools, try to execute them automatically
-        if custom_tool_ids:
-            # For each custom tool, attempt execution
-            executed_results = []
-            
-            for tool_id in custom_tool_ids:
-                custom_tool = dynamic_tool_builder.get_tool(tool_id)
-                if not custom_tool:
-                    continue
-                
-                # Extract parameters from the message intelligently
-                params = {}
-                
-                # For text processing tools, check common patterns
-                if custom_tool['integration_type'] == 'custom_code':
-                    # Try to find text in the message
-                    import re
-                    
-                    # Priority 1: Extract text in quotes (both single and double)
-                    quoted_text = re.findall(r'["\']([^"\']+)["\']', message)
-                    if quoted_text:
-                        params['text'] = quoted_text[0]
-                        logger.info(f"[EXTRACTION] Found quoted text: {quoted_text[0]}")
-                    else:
-                        # Priority 2: Look for "convert X to" or "make X uppercase" patterns
-                        patterns = [
-                            r'convert\s+([^\s]+)\s+to',
-                            r'make\s+([^\s]+)\s+',
-                            r'transform\s+([^\s]+)',
-                            r'process\s+([^\s]+)',
-                            r'uppercase\s+([^\s]+)',
-                            r'lowercase\s+([^\s]+)',
-                        ]
-                        
-                        for pattern in patterns:
-                            match = re.search(pattern, message.lower())
-                            if match:
-                                params['text'] = match.group(1)
-                                logger.info(f"[EXTRACTION] Found via pattern '{pattern}': {match.group(1)}")
-                                break
-                        
-                        # Priority 3: If still no match, use the whole message
-                        if 'text' not in params:
-                            params['text'] = message
-                            logger.info(f"[EXTRACTION] Using whole message as text")
-                
-                # Try executing the tool
-                try:
-                    logger.info(f"[TOOL EXECUTION] Executing {custom_tool['name']} with params: {params}")
-                    result = dynamic_tool_builder.execute_tool(tool_id, params)
-                    
-                    if result.get('success'):
-                        executed_results.append({
-                            'tool_name': custom_tool['name'],
-                            'result': result.get('result', {}),
-                            'success': True
-                        })
-                        logger.info(f"[TOOL SUCCESS] {custom_tool['name']} executed successfully")
-                    else:
-                        executed_results.append({
-                            'tool_name': custom_tool['name'],
-                            'error': result.get('error'),
-                            'success': False
-                        })
-                        logger.error(f"[TOOL FAILED] {custom_tool['name']}: {result.get('error')}")
-                except Exception as e:
-                    logger.error(f"Error executing tool {tool_id}: {str(e)}")
-                    continue
-            
-            # Build response based on execution results
-            if executed_results:
-                response = f"I'm {agent_data['name']}, a {agent_data['role']}.\n\n"
-                
-                for exec_result in executed_results:
-                    if exec_result['success']:
-                        response += f"**{exec_result['tool_name']} Results:**\n\n"
-                        
-                        result_data = exec_result['result']
-                        if isinstance(result_data, dict):
-                            for key, value in result_data.items():
-                                response += f"- **{key.replace('_', ' ').title()}:** {value}\n"
-                        else:
-                            response += f"{result_data}\n"
-                        response += "\n"
-                    else:
-                        response += f"⚠️ {exec_result['tool_name']} failed: {exec_result.get('error', 'Unknown error')}\n\n"
-            else:
-                # No tools were executed successfully
-                response = f"I'm {agent_data['name']}, a {agent_data['role']}.\n\n"
-                response += f"I have access to these tools:\n"
-                for tool_id in custom_tool_ids:
-                    tool = dynamic_tool_builder.get_tool(tool_id)
-                    if tool:
-                        response += f"- {tool['name']}: {tool['description']}\n"
-                response += f"\nHowever, I couldn't process your request. Please provide input in a clearer format."
-        else:
-            # No custom tools - just basic response
-            response = f"I'm {agent_data['name']}, a {agent_data['role']}.\n\n"
-            response += f"Instructions: {agent_data['system_instructions']}\n\n"
-            response += f"User message: {message}\n\n"
-            response += "I don't have any custom tools configured yet. Please add tools to enable my capabilities."
-        
-        # Store conversation
-        if "custom" not in conversations:
-            conversations["custom"] = {}
-        if agent_id not in conversations["custom"]:
-            conversations["custom"][agent_id] = []
-        
-        conversations["custom"][agent_id].append({
-            "type": "user",
-            "message": message,
-            "timestamp": datetime.now().isoformat()
-        })
-        conversations["custom"][agent_id].append({
-            "type": "assistant",
-            "message": response,
-            "tools_available": agent_tools,
-            "timestamp": datetime.now().isoformat()
-        })
-        
-        logger.info(f"[CUSTOM AGENT RESPONSE] Final response length: {len(response)}")
-        
-        return jsonify({
-            "agent_id": agent_id,
-            "agent_name": agent_data['name'],
-            "request": message,
-            "response": response,
-            "tools_available": agent_tools,
-            "timestamp": datetime.now().isoformat()
-        }), 200
+    """Chat with a custom agent and automatically execute its tools (with analytics)"""
     
-    except Exception as e:
-        logger.error(f"Error in custom agent chat: {str(e)}")
-        return jsonify({"error": str(e)}), 500
-
+    # Use ExecutionTimer context manager for analytics
+    with ExecutionTimer(agent_analytics, agent_id) as timer:
+        try:
+            data = request.json
+            message = data.get('message', '').strip()
+            
+            if not message:
+                return jsonify({"error": "Message is required"}), 400
+            
+            logger.info(f"[CUSTOM AGENT CHAT] Agent {agent_id} received message: {message}")
+            
+            agent_data = custom_agent_manager.get_agent(agent_id)
+            if not agent_data:
+                return jsonify({"error": f"Agent '{agent_id}' not found"}), 404
+            
+            # Get agent's custom tools
+            agent_tools = agent_data.get('tools', [])
+            custom_tool_ids = [t for t in agent_tools if t.startswith('custom_') or len(t) == 8]
+            
+            response = ""
+            
+            # If agent has custom tools, try to execute them automatically
+            if custom_tool_ids:
+                executed_results = []
+                
+                for tool_id in custom_tool_ids:
+                    custom_tool = dynamic_tool_builder.get_tool(tool_id)
+                    if not custom_tool:
+                        continue
+                    
+                    # Track tool usage for analytics
+                    timer.add_tool_used(custom_tool['name'])
+                    
+                    # Extract parameters from the message intelligently
+                    params = {}
+                    
+                    # For text processing tools, check common patterns
+                    if custom_tool['integration_type'] == 'custom_code':
+                        import re
+                        
+                        # Priority 1: Extract text in quotes (both single and double)
+                        quoted_text = re.findall(r'["\']([^"\']+)["\']', message)
+                        if quoted_text:
+                            params['text'] = quoted_text[0]
+                            logger.info(f"[EXTRACTION] Found quoted text: {quoted_text[0]}")
+                        else:
+                            # Priority 2: Look for "convert X to" or "make X uppercase" patterns
+                            patterns = [
+                                r'convert\s+([^\s]+)\s+to',
+                                r'make\s+([^\s]+)\s+',
+                                r'transform\s+([^\s]+)',
+                                r'process\s+([^\s]+)',
+                                r'uppercase\s+([^\s]+)',
+                                r'lowercase\s+([^\s]+)',
+                            ]
+                            
+                            for pattern in patterns:
+                                match = re.search(pattern, message.lower())
+                                if match:
+                                    params['text'] = match.group(1)
+                                    logger.info(f"[EXTRACTION] Found via pattern '{pattern}': {match.group(1)}")
+                                    break
+                            
+                            # Priority 3: If still no match, use the whole message
+                            if 'text' not in params:
+                                params['text'] = message
+                                logger.info(f"[EXTRACTION] Using whole message as text")
+                    
+                    # Try executing the tool
+                    try:
+                        logger.info(f"[TOOL EXECUTION] Executing {custom_tool['name']} with params: {params}")
+                        result = dynamic_tool_builder.execute_tool(tool_id, params)
+                        
+                        if result.get('success'):
+                            executed_results.append({
+                                'tool_name': custom_tool['name'],
+                                'result': result.get('result', {}),
+                                'success': True
+                            })
+                            logger.info(f"[TOOL SUCCESS] {custom_tool['name']} executed successfully")
+                        else:
+                            executed_results.append({
+                                'tool_name': custom_tool['name'],
+                                'error': result.get('error'),
+                                'success': False
+                            })
+                            logger.error(f"[TOOL FAILED] {custom_tool['name']}: {result.get('error')}")
+                    except Exception as e:
+                        logger.error(f"Error executing tool {tool_id}: {str(e)}")
+                        continue
+                
+                # Build response based on execution results
+                if executed_results:
+                    response = f"I'm {agent_data['name']}, a {agent_data['role']}.\n\n"
+                    
+                    for exec_result in executed_results:
+                        if exec_result['success']:
+                            response += f"**{exec_result['tool_name']} Results:**\n\n"
+                            
+                            result_data = exec_result['result']
+                            if isinstance(result_data, dict):
+                                for key, value in result_data.items():
+                                    response += f"- **{key.replace('_', ' ').title()}:** {value}\n"
+                            else:
+                                response += f"{result_data}\n"
+                            response += "\n"
+                        else:
+                            response += f"⚠️ {exec_result['tool_name']} failed: {exec_result.get('error', 'Unknown error')}\n\n"
+                else:
+                    response = f"I'm {agent_data['name']}, a {agent_data['role']}.\n\n"
+                    response += f"I have access to these tools:\n"
+                    for tool_id in custom_tool_ids:
+                        tool = dynamic_tool_builder.get_tool(tool_id)
+                        if tool:
+                            response += f"- {tool['name']}: {tool['description']}\n"
+                    response += f"\nHowever, I couldn't process your request. Please provide input in a clearer format."
+            else:
+                response = f"I'm {agent_data['name']}, a {agent_data['role']}.\n\n"
+                response += f"Instructions: {agent_data['system_instructions']}\n\n"
+                response += f"User message: {message}\n\n"
+                response += "I don't have any custom tools configured yet. Please add tools to enable my capabilities."
+            
+            # Store conversation
+            if "custom" not in conversations:
+                conversations["custom"] = {}
+            if agent_id not in conversations["custom"]:
+                conversations["custom"][agent_id] = []
+            
+            conversations["custom"][agent_id].append({
+                "type": "user",
+                "message": message,
+                "timestamp": datetime.now().isoformat()
+            })
+            conversations["custom"][agent_id].append({
+                "type": "assistant",
+                "message": response,
+                "tools_available": agent_tools,
+                "timestamp": datetime.now().isoformat()
+            })
+            
+            logger.info(f"[CUSTOM AGENT RESPONSE] Final response length: {len(response)}")
+            
+            return jsonify({
+                "agent_id": agent_id,
+                "agent_name": agent_data['name'],
+                "request": message,
+                "response": response,
+                "tools_available": agent_tools,
+                "timestamp": datetime.now().isoformat()
+            }), 200
+        
+        except Exception as e:
+            logger.error(f"Error in custom agent chat: {str(e)}")
+            return jsonify({"error": str(e)}), 500
+        
 # Add an endpoint to execute a tool from an agent
 @app.route('/api/agents/custom/<agent_id>/execute-tool', methods=['POST'])
 def execute_agent_tool(agent_id):
@@ -1476,7 +1492,313 @@ def execute_dynamic_tool(tool_id):
     except Exception as e:
         logger.error(f"Error executing tool: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+
+# ============================================================================
+# CONFIGURATION ENDPOINTS
+# ============================================================================
+
+@app.route('/api/config', methods=['GET'])
+def get_config():
+    """Get current configuration"""
+    return jsonify({
+        "storage_backend": Config.STORAGE_BACKEND,
+        "database_type": Config.DATABASE_TYPE if Config.STORAGE_BACKEND == 'database' else None,
+        "analytics_enabled": Config.ENABLE_ANALYTICS,
+        "testing_enabled": Config.ENABLE_TESTING
+    }), 200
+
+
+@app.route('/api/config/storage', methods=['POST'])
+def switch_storage():
+    """Switch storage backend"""
+    try:
+        data = request.json
+        backend = data.get('backend', 'json')
         
+        if backend not in ['json', 'database']:
+            return jsonify({"error": "Backend must be 'json' or 'database'"}), 400
+        
+        Config.switch_storage_backend(backend)
+        
+        # Reinitialize managers with new backend
+        global custom_agent_manager, dynamic_tool_builder
+        from agents.custom_agents import CustomAgentManager
+        from tools.dynamic_tools import DynamicToolBuilder
+        
+        custom_agent_manager = CustomAgentManager()
+        dynamic_tool_builder = DynamicToolBuilder()
+        
+        return jsonify({
+            "success": True,
+            "message": f"Switched to {backend} storage",
+            "backend": backend
+        }), 200
+    
+    except Exception as e:
+        logger.error(f"Error switching storage: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+# ============================================================================
+# ANALYTICS ENDPOINTS
+# ============================================================================
+
+@app.route('/api/analytics/agents/<agent_id>', methods=['GET'])
+def get_agent_analytics(agent_id):
+    """Get analytics for a specific agent"""
+    try:
+        stats = agent_analytics.get_agent_stats(agent_id)
+        return jsonify(stats), 200
+    except Exception as e:
+        logger.error(f"Error getting analytics: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/analytics/agents', methods=['GET'])
+def get_all_analytics():
+    """Get analytics for all agents"""
+    try:
+        stats = agent_analytics.get_all_stats()
+        return jsonify({"agents": stats}), 200
+    except Exception as e:
+        logger.error(f"Error getting all analytics: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/analytics/dashboard', methods=['GET'])
+def get_analytics_dashboard():
+    """Get dashboard summary of all analytics"""
+    try:
+        all_stats = agent_analytics.get_all_stats()
+        
+        total_executions = sum(s['total_executions'] for s in all_stats)
+        avg_success_rate = sum(s['success_rate'] for s in all_stats) / len(all_stats) if all_stats else 0
+        
+        return jsonify({
+            "total_agents": len(all_stats),
+            "total_executions": total_executions,
+            "avg_success_rate": round(avg_success_rate, 2),
+            "top_agents": all_stats[:5],  # Top 5 by usage
+            "timestamp": datetime.now().isoformat()
+        }), 200
+    except Exception as e:
+        logger.error(f"Error getting analytics dashboard: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+# ============================================================================
+# TESTING ENDPOINTS
+# ============================================================================
+
+@app.route('/api/testing/agents/<agent_id>/suite', methods=['POST'])
+def create_test_suite(agent_id):
+    """Create a test suite for an agent"""
+    try:
+        data = request.json
+        agent_name = data.get('agent_name', f'Agent {agent_id}')
+        tests = data.get('tests', [])
+        
+        suite = agent_tester.create_test_suite(agent_id, agent_name)
+        
+        for test_data in tests:
+            suite.add_quick_test(
+                name=test_data.get('name'),
+                input_message=test_data.get('input'),
+                expected_contains=test_data.get('expected_contains')
+            )
+        
+        return jsonify({
+            "success": True,
+            "agent_id": agent_id,
+            "test_count": len(tests),
+            "suite": suite.to_dict()
+        }), 201
+    
+    except Exception as e:
+        logger.error(f"Error creating test suite: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/testing/agents/<agent_id>/suite', methods=['GET'])
+def get_test_suite(agent_id):
+    """Get test suite for an agent"""
+    try:
+        suite = agent_tester.get_test_suite(agent_id)
+        return jsonify(suite.to_dict()), 200
+    except Exception as e:
+        logger.error(f"Error getting test suite: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/testing/agents/<agent_id>/run', methods=['POST'])
+def run_agent_tests(agent_id):
+    """Run all tests for an agent"""
+    try:
+        data = request.json
+        agent_type = data.get('agent_type', 'custom')
+        
+        result = agent_tester.run_test_suite(agent_id, agent_type)
+        
+        broadcast_update('test_completed', {
+            'agent_id': agent_id,
+            'passed': result['passed'],
+            'failed': result['failed']
+        })
+        
+        return jsonify(result), 200
+    except Exception as e:
+        logger.error(f"Error running tests: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/testing/agents/<agent_id>/history', methods=['GET'])
+def get_test_history(agent_id):
+    """Get test history for an agent"""
+    try:
+        history = agent_tester.get_test_history(agent_id)
+        summary = agent_tester.get_test_summary(agent_id)
+        
+        return jsonify({
+            "agent_id": agent_id,
+            "summary": summary,
+            "history": history[-50:]  # Last 50 tests
+        }), 200
+    except Exception as e:
+        logger.error(f"Error getting test history: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/testing/agents/<agent_id>/quick-test', methods=['POST'])
+def quick_test_agent(agent_id):
+    """Run a quick ad-hoc test"""
+    try:
+        data = request.json
+        test_input = data.get('input')
+        expected_contains = data.get('expected_contains')
+        agent_type = data.get('agent_type', 'custom')
+        
+        if not test_input:
+            return jsonify({"error": "input is required"}), 400
+        
+        # Create temporary test case
+        test_case = TestCase(
+            name="Quick Test",
+            input_message=test_input,
+            expected_output=expected_contains
+        )
+        
+        if expected_contains:
+            test_case.validation_func = lambda response: expected_contains.lower() in response.lower()
+        
+        result = agent_tester.run_test(agent_id, test_case, agent_type)
+        
+        return jsonify(result), 200
+    except Exception as e:
+        logger.error(f"Error running quick test: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+# ============================================================================
+# TEMPLATES ENDPOINTS
+# ============================================================================
+
+@app.route('/api/templates', methods=['GET'])
+def list_agent_templates():
+    """List all agent templates"""
+    try:
+        category = request.args.get('category')
+        difficulty = request.args.get('difficulty')
+        search = request.args.get('search')
+        
+        if search:
+            templates = agent_template_library.search_templates(search)
+        else:
+            templates = agent_template_library.list_templates(category, difficulty)
+        
+        categories = agent_template_library.get_categories()
+        
+        return jsonify({
+            "templates": templates,
+            "total": len(templates),
+            "categories": categories
+        }), 200
+    except Exception as e:
+        logger.error(f"Error listing templates: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/templates/<template_id>', methods=['GET'])
+def get_template_details(template_id):
+    """Get details of a specific template"""
+    try:
+        template = agent_template_library.get_template(template_id)
+        
+        if not template:
+            return jsonify({"error": "Template not found"}), 404
+        
+        return jsonify(template.to_dict()), 200
+    except Exception as e:
+        logger.error(f"Error getting template: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/templates/<template_id>/create-agent', methods=['POST'])
+def create_agent_from_template(template_id):
+    """Create an agent from a template"""
+    try:
+        data = request.json
+        user_id = data.get('user_id', 'default_user')
+        
+        result = agent_template_library.create_agent_from_template(
+            template_id,
+            custom_agent_manager,
+            user_id
+        )
+        
+        if result["success"]:
+            broadcast_update('agent_created_from_template', {
+                'agent_id': result['agent_id'],
+                'template_id': template_id
+            })
+        
+        return jsonify(result), 201 if result["success"] else 400
+    except Exception as e:
+        logger.error(f"Error creating agent from template: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/templates/categories', methods=['GET'])
+def get_template_categories():
+    """Get all template categories"""
+    try:
+        categories = agent_template_library.get_categories()
+        return jsonify({"categories": categories}), 200
+    except Exception as e:
+        logger.error(f"Error getting categories: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/templates/search', methods=['GET'])
+def search_templates():
+    """Search templates"""
+    try:
+        query = request.args.get('q', '')
+        
+        if not query:
+            return jsonify({"error": "Search query is required"}), 400
+        
+        results = agent_template_library.search_templates(query)
+        
+        return jsonify({
+            "query": query,
+            "results": results,
+            "count": len(results)
+        }), 200
+    except Exception as e:
+        logger.error(f"Error searching templates: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
 # ============================================================================
 # ERROR HANDLERS
 # ============================================================================

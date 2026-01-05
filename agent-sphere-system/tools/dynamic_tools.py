@@ -9,6 +9,7 @@ import requests
 from datetime import datetime
 from typing import Dict, List, Any
 import logging
+from store.storage_backends import get_storage_backend
 
 logger = logging.getLogger(__name__)
 
@@ -35,14 +36,13 @@ class DynamicToolBuilder:
     
     def __init__(self):
         # Load existing tools from disk
-        self.custom_tools = load_custom_tools()
-        self.tool_templates = {}
-        
-        print(f"✅ Loaded {len(self.custom_tools)} custom tools from disk")
+        self.storage = get_storage_backend()
+        self.custom_tools = self.storage.load_tools()
+        print(f"✅ Loaded {len(self.custom_tools)} custom tools")
     
     def _save_to_disk(self):
         """Save current tools to disk"""
-        return save_custom_tools(self.custom_tools)
+        return self.storage.save_tools(self.custom_tools)
     
     def create_tool(self, tool_config: Dict) -> Dict:
         """Create a new custom tool"""

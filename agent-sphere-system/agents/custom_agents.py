@@ -7,6 +7,9 @@ import uuid
 from datetime import datetime
 from typing import Dict, List
 from base.agent_framework import Agent, Tool
+from store.storage_backends import get_storage_backend
+
+
 
 # Import persistence functions
 try:
@@ -24,23 +27,26 @@ class CustomAgentManager:
     """Manages user-created and published agents with persistence"""
     
     def __init__(self):
-        # Load existing agents from disk
-        loaded_agents = load_custom_agents()
-        self.custom_agents = loaded_agents.get("custom_agents", {})
-        self.published_agents = loaded_agents.get("published_agents", {})
-        self.agent_marketplace = loaded_agents.get("agent_marketplace", [])
+        # Use storage backend instead of direct file I/O
+        self.storage = get_storage_backend()
         
-        print(f"✅ Loaded {len(self.custom_agents)} custom agents from disk")
+        # Load existing agents from storage
+        loaded_data = self.storage.load_agents()
+        self.custom_agents = loaded_data.get("custom_agents", {})
+        self.published_agents = loaded_data.get("published_agents", {})
+        self.agent_marketplace = loaded_data.get("agent_marketplace", [])
+        
+        print(f"✅ Loaded {len(self.custom_agents)} custom agents")
         print(f"✅ Loaded {len(self.agent_marketplace)} marketplace agents")
     
     def _save_to_disk(self):
-        """Save current state to disk"""
+        """Save current state using storage backend"""
         data = {
             "custom_agents": self.custom_agents,
             "published_agents": self.published_agents,
             "agent_marketplace": self.agent_marketplace
         }
-        return save_custom_agents(data)
+        return self.storage.save_agents(data)
     
     def create_agent(self, agent_config: Dict) -> Dict:
         """Create a new custom agent from configuration"""

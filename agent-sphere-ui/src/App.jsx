@@ -3,6 +3,10 @@ import io from "socket.io-client";
 import WorkflowBuilder from "./components/WorkflowBuilder";
 import AgentBuilder from "./components/AgentBuilder";
 import ToolBuilder from "./components/ToolBuilder";
+import AnalyticsDashboard from "./components/AnalyticsDashboard";
+import TestRunner from "./components/TestRunner";
+import TemplateBrowser from "./components/TemplateBrowser";
+
 import "./App.css";
 
 const API_URL = "http://localhost:5000/api";
@@ -1434,6 +1438,26 @@ export default function App() {
         >
           🎨 Visual Builder
         </button>
+        <button
+          className={`nav-btn ${activeTab === "analytics" ? "active" : ""}`}
+          onClick={() => setActiveTab("analytics")}
+        >
+          📊 Analytics
+        </button>
+
+        <button
+          className={`nav-btn ${activeTab === "testing" ? "active" : ""}`}
+          onClick={() => setActiveTab("testing")}
+        >
+          🧪 Testing
+        </button>
+
+        <button
+          className={`nav-btn ${activeTab === "templates" ? "active" : ""}`}
+          onClick={() => setActiveTab("templates")}
+        >
+          📚 Templates
+        </button>
       </nav>
       <main className="content">
         {activeTab === "builder" && (
@@ -1450,6 +1474,18 @@ export default function App() {
           <section className="section">
             <ToolBuilder showNotification={showNotification} />
           </section>
+        )}
+
+        {activeTab === "analytics" && (
+          <AnalyticsDashboard showNotification={showNotification} />
+        )}
+
+        {activeTab === "testing" && (
+          <TestRunner showNotification={showNotification} />
+        )}
+
+        {activeTab === "templates" && (
+          <TemplateBrowser showNotification={showNotification} />
         )}
 
         {activeTab === "customAgents" && (

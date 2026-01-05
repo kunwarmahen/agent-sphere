@@ -1,0 +1,106 @@
+{
+  "custom_agents": {
+    "b10b06e2": {
+      "id": "b10b06e2",
+      "name": "Text Processor",
+      "role": "Text Processor Provider",
+      "description": "",
+      "system_instructions": "Hey you are an assistant which processes text and provides uppercase, lowercase and length of the text provided",
+      "tools": [
+        "cdaf19db"
+      ],
+      "created_by": "default_user",
+      "created_at": "2025-10-26T14:37:33.406039",
+      "updated_at": "2025-10-26T14:37:33.406044",
+      "published": true,
+      "version": "1.0.0",
+      "tags": [],
+      "status": "published",
+      "published_at": "2025-10-26T14:37:41.388738"
+    },
+    "85ff677a": {
+      "id": "85ff677a",
+      "name": "Hello World",
+      "role": "Hello World Responder",
+      "description": "",
+      "system_instructions": "Hey you respond with the Hello world when the person provides his name",
+      "tools": [
+        "4717a71b"
+      ],
+      "created_by": "default_user",
+      "created_at": "2025-10-26T14:40:11.385988",
+      "updated_at": "2025-10-26T14:40:11.386014",
+      "published": true,
+      "version": "1.0.0",
+      "tags": [],
+      "status": "published",
+      "published_at": "2025-10-26T14:40:13.782203"
+    }
+  },
+  "published_agents": {
+    "b10b06e2": {
+      "id": "b10b06e2",
+      "name": "Text Processor",
+      "role": "Text Processor Provider",
+      "description": "",
+      "system_instructions": "Hey you are an assistant which processes text and provides uppercase, lowercase and length of the text provided",
+      "tools": [
+        "cdaf19db"
+      ],
+      "created_by": "default_user",
+      "created_at": "2025-10-26T14:37:33.406039",
+      "updated_at": "2025-10-26T14:37:33.406044",
+      "published": true,
+      "version": "1.0.0",
+      "tags": [],
+      "status": "published",
+      "published_at": "2025-10-26T14:37:41.388738"
+    },
+    "85ff677a": {
+      "id": "85ff677a",
+      "name": "Hello World",
+      "role": "Hello World Responder",
+      "description": "",
+      "system_instructions": "Hey you respond with the Hello world when the person provides his name",
+      "tools": [
+        "4717a71b"
+      ],
+      "created_by": "default_user",
+      "created_at": "2025-10-26T14:40:11.385988",
+      "updated_at": "2025-10-26T14:40:11.386014",
+      "published": true,
+      "version": "1.0.0",
+      "tags": [],
+      "status": "published",
+      "published_at": "2025-10-26T14:40:13.782203"
+    }
+  },
+  "agent_marketplace": [
+    {
+      "id": "b10b06e2",
+      "name": "Text Processor",
+      "role": "Text Processor Provider",
+      "description": "",
+      "created_by": "default_user",
+      "published_at": "2025-10-26T14:37:41.388738",
+      "version": "1.0.0",
+      "tags": [],
+      "downloads": 0,
+      "rating": 0,
+      "reviews": []
+    },
+    {
+      "id": "85ff677a",
+      "name": "Hello World",
+      "role": "Hello World Responder",
+      "description": "",
+      "created_by": "default_user",
+      "published_at": "2025-10-26T14:40:13.782203",
+      "version": "1.0.0",
+      "tags": [],
+      "downloads": 0,
+      "rating": 0,
+      "reviews": []
+    }
+  ]
+}
