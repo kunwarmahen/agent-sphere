@@ -566,8 +566,8 @@ export default function App() {
   const fetchTodayCalendarData = async () => {
     setCalendarDataLoading(true);
     try {
-      // Fetch today's events (0 days ahead = today only)
-      const eventsResponse = await fetch(`${API_URL}/calendar/events?days=0`);
+      // Fetch upcoming events (7 days ahead to show all upcoming events)
+      const eventsResponse = await fetch(`${API_URL}/calendar/events?days=7`);
       const eventsData = await eventsResponse.json();
 
       // Fetch emails
@@ -2531,14 +2531,14 @@ export default function App() {
                 gap: "1.5rem",
               }}
             >
-              {/* Today's Events */}
+              {/* Upcoming Events */}
               <div className="home-card">
-                <h3>📆 Today's Events</h3>
+                <h3>📆 Upcoming Events (Next 7 Days)</h3>
                 {calendarDataLoading ? (
                   <p style={{ color: "#999" }}>Loading...</p>
                 ) : todayEvents.length === 0 ? (
                   <p style={{ color: "#999", fontSize: "0.9rem" }}>
-                    No events scheduled for today
+                    No upcoming events
                   </p>
                 ) : (
                   <div
@@ -2565,7 +2565,7 @@ export default function App() {
                             marginBottom: "0.25rem",
                           }}
                         >
-                          {event.title}
+                          {event.summary || event.title}
                         </strong>
                         <small
                           style={{
@@ -2574,7 +2574,12 @@ export default function App() {
                             marginBottom: "0.25rem",
                           }}
                         >
-                          ⏰{" "}
+                          📅{" "}
+                          {new Date(event.start).toLocaleDateString([], {
+                            month: "short",
+                            day: "numeric",
+                          })}
+                          {" at "}
                           {new Date(event.start).toLocaleTimeString([], {
                             hour: "2-digit",
                             minute: "2-digit",
@@ -2609,14 +2614,14 @@ export default function App() {
                 </button>
               </div>
 
-              {/* Today's Emails */}
+              {/* Recent Emails */}
               <div className="home-card">
-                <h3>📧 Today's Emails</h3>
+                <h3>📧 Recent Emails (Last 10)</h3>
                 {calendarDataLoading ? (
                   <p style={{ color: "#999" }}>Loading...</p>
                 ) : todayEmails.length === 0 ? (
                   <p style={{ color: "#999", fontSize: "0.9rem" }}>
-                    No emails from today
+                    No recent emails
                   </p>
                 ) : (
                   <div
