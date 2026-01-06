@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 
 const API_URL = "http://localhost:5000/api";
 
-export default function TestRunner({ showNotification }) {
+export default function TestRunner({ showNotification, theme = 'matrix' }) {
   const [myAgents, setMyAgents] = useState([]);
   const [selectedAgent, setSelectedAgent] = useState(null);
   const [testSuite, setTestSuite] = useState(null);
@@ -10,6 +10,14 @@ export default function TestRunner({ showNotification }) {
   const [testHistory, setTestHistory] = useState(null);
   const [loading, setLoading] = useState(false);
   const [running, setRunning] = useState(false);
+
+  // Theme colors
+  const accentColor = theme === 'classic' ? '#667eea' : theme === 'cyber' ? '#00d9ff' : '#00ff41';
+  const cardBg = theme === 'classic' ? 'white' : 'rgba(0, 0, 0, 0.4)';
+  const cardBorder = theme === 'classic' ? '#e0e0e0' : theme === 'cyber' ? 'rgba(0, 217, 255, 0.3)' : 'rgba(0, 255, 65, 0.3)';
+  const lightBg = theme === 'classic' ? '#f8f9ff' : 'rgba(0, 255, 65, 0.05)';
+  const textColor = theme === 'classic' ? '#333' : 'rgba(255, 255, 255, 0.9)';
+  const mutedColor = theme === 'classic' ? '#666' : 'rgba(255, 255, 255, 0.6)';
 
   // Quick test form
   const [quickTestInput, setQuickTestInput] = useState("");
@@ -263,13 +271,13 @@ export default function TestRunner({ showNotification }) {
                     padding: "0.75rem",
                     background:
                       selectedAgent === agent.id
-                        ? "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
-                        : "white",
-                    border: "2px solid #e0e0e0",
+                        ? (theme === 'classic' ? "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" : accentColor)
+                        : cardBg,
+                    border: `2px solid ${selectedAgent === agent.id ? accentColor : cardBorder}`,
                     borderRadius: "8px",
                     cursor: "pointer",
                     textAlign: "left",
-                    color: selectedAgent === agent.id ? "white" : "#333",
+                    color: selectedAgent === agent.id ? (theme === 'classic' ? "white" : "#0d0208") : textColor,
                     fontWeight: selectedAgent === agent.id ? "bold" : "normal",
                     transition: "all 0.3s ease",
                   }}
@@ -291,8 +299,8 @@ export default function TestRunner({ showNotification }) {
               {/* Quick Test Section */}
               <div
                 style={{
-                  background: "#f8f9ff",
-                  border: "2px solid #e0e0e0",
+                  background: lightBg,
+                  border: `2px solid ${cardBorder}`,
                   borderRadius: "10px",
                   padding: "1.5rem",
                   marginBottom: "2rem",
@@ -346,8 +354,8 @@ export default function TestRunner({ showNotification }) {
               {/* Test Suite Section */}
               <div
                 style={{
-                  background: "white",
-                  border: "2px solid #e0e0e0",
+                  background: cardBg,
+                  border: `2px solid ${cardBorder}`,
                   borderRadius: "10px",
                   padding: "1.5rem",
                   marginBottom: "2rem",
@@ -378,7 +386,7 @@ export default function TestRunner({ showNotification }) {
                     <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>
                       📝
                     </div>
-                    <p style={{ color: "#666", marginBottom: "1rem" }}>
+                    <p style={{ color: mutedColor, marginBottom: "1rem" }}>
                       No test suite found for this agent
                     </p>
                     <button onClick={createTestSuite} className="primary-btn">
@@ -406,8 +414,8 @@ export default function TestRunner({ showNotification }) {
                             key={index}
                             style={{
                               padding: "1rem",
-                              background: "#f8f9ff",
-                              border: "2px solid #e0e0e0",
+                              background: lightBg,
+                              border: `2px solid ${cardBorder}`,
                               borderRadius: "8px",
                             }}
                           >
@@ -422,7 +430,7 @@ export default function TestRunner({ showNotification }) {
                             <div
                               style={{
                                 fontSize: "0.9rem",
-                                color: "#666",
+                                color: mutedColor,
                                 marginBottom: "0.25rem",
                               }}
                             >
@@ -453,7 +461,7 @@ export default function TestRunner({ showNotification }) {
                       <div
                         style={{
                           padding: "1rem",
-                          background: "#f8f9ff",
+                          background: lightBg,
                           border: "2px solid #667eea",
                           borderRadius: "8px",
                         }}
@@ -541,8 +549,8 @@ export default function TestRunner({ showNotification }) {
               {testResults && (
                 <div
                   style={{
-                    background: "white",
-                    border: "2px solid #e0e0e0",
+                    background: cardBg,
+                    border: `2px solid ${cardBorder}`,
                     borderRadius: "10px",
                     padding: "1.5rem",
                     marginBottom: "2rem",
@@ -607,7 +615,7 @@ export default function TestRunner({ showNotification }) {
                     <div
                       style={{
                         padding: "1rem",
-                        background: "#f8f9ff",
+                        background: lightBg,
                         borderRadius: "8px",
                         textAlign: "center",
                       }}
@@ -616,7 +624,7 @@ export default function TestRunner({ showNotification }) {
                         style={{
                           fontSize: "2rem",
                           fontWeight: "bold",
-                          color: "#667eea",
+                          color: accentColor,
                         }}
                       >
                         {testResults.pass_rate}%
@@ -628,7 +636,7 @@ export default function TestRunner({ showNotification }) {
                     <div
                       style={{
                         padding: "1rem",
-                        background: "#f8f9ff",
+                        background: lightBg,
                         borderRadius: "8px",
                         textAlign: "center",
                       }}
@@ -637,7 +645,7 @@ export default function TestRunner({ showNotification }) {
                         style={{
                           fontSize: "2rem",
                           fontWeight: "bold",
-                          color: "#667eea",
+                          color: accentColor,
                         }}
                       >
                         {testResults.avg_response_time_ms}ms
@@ -682,7 +690,7 @@ export default function TestRunner({ showNotification }) {
                           <span
                             style={{
                               fontSize: "0.85rem",
-                              color: "#666",
+                              color: mutedColor,
                             }}
                           >
                             {result.response_time_ms}ms
@@ -731,8 +739,8 @@ export default function TestRunner({ showNotification }) {
               {testHistory && testHistory.summary && (
                 <div
                   style={{
-                    background: "white",
-                    border: "2px solid #e0e0e0",
+                    background: cardBg,
+                    border: `2px solid ${cardBorder}`,
                     borderRadius: "10px",
                     padding: "1.5rem",
                   }}
@@ -754,7 +762,7 @@ export default function TestRunner({ showNotification }) {
                     <div
                       style={{
                         padding: "1rem",
-                        background: "#f8f9ff",
+                        background: lightBg,
                         borderRadius: "8px",
                         textAlign: "center",
                       }}
@@ -763,7 +771,7 @@ export default function TestRunner({ showNotification }) {
                         style={{
                           fontSize: "1.5rem",
                           fontWeight: "bold",
-                          color: "#667eea",
+                          color: accentColor,
                         }}
                       >
                         {testHistory.summary.total_test_runs}
@@ -775,7 +783,7 @@ export default function TestRunner({ showNotification }) {
                     <div
                       style={{
                         padding: "1rem",
-                        background: "#f8f9ff",
+                        background: lightBg,
                         borderRadius: "8px",
                         textAlign: "center",
                       }}
@@ -784,7 +792,7 @@ export default function TestRunner({ showNotification }) {
                         style={{
                           fontSize: "1.5rem",
                           fontWeight: "bold",
-                          color: "#667eea",
+                          color: accentColor,
                         }}
                       >
                         {testHistory.summary.overall_pass_rate}%
@@ -814,7 +822,7 @@ export default function TestRunner({ showNotification }) {
                               justifyContent: "space-between",
                               alignItems: "center",
                               padding: "0.75rem",
-                              background: "#f8f9ff",
+                              background: lightBg,
                               borderRadius: "6px",
                               border: "1px solid #e0e0e0",
                             }}
@@ -856,7 +864,7 @@ export default function TestRunner({ showNotification }) {
                 borderRadius: "10px",
                 padding: "3rem",
                 textAlign: "center",
-                color: "#666",
+                color: mutedColor,
               }}
             >
               <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>🧪</div>

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 
 const API_URL = "http://localhost:5000/api";
 
-export default function TemplateBrowser({ showNotification }) {
+export default function TemplateBrowser({ showNotification, theme = 'matrix' }) {
   const [templates, setTemplates] = useState([]);
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -11,6 +11,14 @@ export default function TemplateBrowser({ showNotification }) {
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+
+  // Theme colors
+  const accentColor = theme === 'classic' ? '#667eea' : theme === 'cyber' ? '#00d9ff' : '#00ff41';
+  const cardBg = theme === 'classic' ? 'white' : 'rgba(0, 0, 0, 0.4)';
+  const cardBorder = theme === 'classic' ? '#e0e0e0' : theme === 'cyber' ? 'rgba(0, 217, 255, 0.3)' : 'rgba(0, 255, 65, 0.3)';
+  const lightBg = theme === 'classic' ? '#f8f9ff' : 'rgba(0, 255, 65, 0.05)';
+  const textColor = theme === 'classic' ? '#333' : 'rgba(255, 255, 255, 0.9)';
+  const mutedColor = theme === 'classic' ? '#666' : 'rgba(255, 255, 255, 0.6)';
 
   useEffect(() => {
     fetchTemplates();
@@ -141,8 +149,8 @@ export default function TemplateBrowser({ showNotification }) {
       {/* Search and Filters */}
       <div
         style={{
-          background: "white",
-          border: "2px solid #e0e0e0",
+          background: cardBg,
+          border: `2px solid ${cardBorder}`,
           borderRadius: "10px",
           padding: "1.5rem",
           marginBottom: "2rem",
@@ -250,8 +258,8 @@ export default function TemplateBrowser({ showNotification }) {
               key={template.template_id}
               onClick={() => setSelectedTemplate(template)}
               style={{
-                background: "white",
-                border: "2px solid #e0e0e0",
+                background: cardBg,
+                border: `2px solid ${cardBorder}`,
                 borderRadius: "12px",
                 padding: "1.5rem",
                 cursor: "pointer",
@@ -277,7 +285,7 @@ export default function TemplateBrowser({ showNotification }) {
                   position: "absolute",
                   top: "1rem",
                   right: "1rem",
-                  background: "#667eea",
+                  background: accentColor,
                   color: "white",
                   padding: "0.25rem 0.75rem",
                   borderRadius: "12px",
@@ -293,7 +301,7 @@ export default function TemplateBrowser({ showNotification }) {
                 <h3
                   style={{
                     margin: "0 0 0.5rem 0",
-                    color: "#333",
+                    color: textColor,
                     fontSize: "1.2rem",
                   }}
                 >
@@ -301,7 +309,7 @@ export default function TemplateBrowser({ showNotification }) {
                 </h3>
                 <div
                   style={{
-                    color: "#666",
+                    color: mutedColor,
                     fontSize: "0.9rem",
                     marginBottom: "1rem",
                     fontStyle: "italic",
@@ -311,7 +319,7 @@ export default function TemplateBrowser({ showNotification }) {
                 </div>
                 <p
                   style={{
-                    color: "#666",
+                    color: mutedColor,
                     fontSize: "0.9rem",
                     lineHeight: "1.6",
                     marginBottom: "1rem",
@@ -333,8 +341,8 @@ export default function TemplateBrowser({ showNotification }) {
                     <span
                       key={index}
                       style={{
-                        background: "#f8f9ff",
-                        color: "#667eea",
+                        background: lightBg,
+                        color: accentColor,
                         padding: "0.25rem 0.5rem",
                         borderRadius: "4px",
                         fontSize: "0.75rem",
@@ -397,7 +405,7 @@ export default function TemplateBrowser({ showNotification }) {
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              background: "white",
+              background: cardBg,
               borderRadius: "15px",
               padding: "2rem",
               maxWidth: "700px",
@@ -432,7 +440,7 @@ export default function TemplateBrowser({ showNotification }) {
                 </div>
                 <div
                   style={{
-                    color: "#666",
+                    color: mutedColor,
                     fontSize: "1rem",
                     fontStyle: "italic",
                   }}
@@ -466,7 +474,7 @@ export default function TemplateBrowser({ showNotification }) {
             >
               <span
                 style={{
-                  background: "#667eea",
+                  background: accentColor,
                   color: "white",
                   padding: "0.4rem 0.9rem",
                   borderRadius: "20px",
@@ -492,26 +500,26 @@ export default function TemplateBrowser({ showNotification }) {
 
             {/* Description */}
             <div style={{ marginBottom: "1.5rem" }}>
-              <h3 style={{ color: "#667eea", marginBottom: "0.75rem" }}>
+              <h3 style={{ color: accentColor, marginBottom: "0.75rem" }}>
                 📝 Description
               </h3>
-              <p style={{ color: "#666", lineHeight: "1.6" }}>
+              <p style={{ color: mutedColor, lineHeight: "1.6" }}>
                 {selectedTemplate.description}
               </p>
             </div>
 
             {/* System Instructions */}
             <div style={{ marginBottom: "1.5rem" }}>
-              <h3 style={{ color: "#667eea", marginBottom: "0.75rem" }}>
+              <h3 style={{ color: accentColor, marginBottom: "0.75rem" }}>
                 🎯 System Instructions
               </h3>
               <div
                 style={{
-                  background: "#f8f9ff",
+                  background: lightBg,
                   padding: "1rem",
                   borderRadius: "8px",
-                  border: "2px solid #e0e0e0",
-                  color: "#666",
+                  border: `2px solid ${cardBorder}`,
+                  color: mutedColor,
                   lineHeight: "1.6",
                   fontSize: "0.95rem",
                 }}
@@ -522,7 +530,7 @@ export default function TemplateBrowser({ showNotification }) {
 
             {/* Tools */}
             <div style={{ marginBottom: "1.5rem" }}>
-              <h3 style={{ color: "#667eea", marginBottom: "0.75rem" }}>
+              <h3 style={{ color: accentColor, marginBottom: "0.75rem" }}>
                 🔧 Included Tools ({selectedTemplate.tools?.length})
               </h3>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
@@ -546,7 +554,7 @@ export default function TemplateBrowser({ showNotification }) {
 
             {/* Tags */}
             <div style={{ marginBottom: "2rem" }}>
-              <h3 style={{ color: "#667eea", marginBottom: "0.75rem" }}>
+              <h3 style={{ color: accentColor, marginBottom: "0.75rem" }}>
                 🏷️ Tags
               </h3>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
@@ -554,8 +562,8 @@ export default function TemplateBrowser({ showNotification }) {
                   <span
                     key={index}
                     style={{
-                      background: "#f8f9ff",
-                      color: "#667eea",
+                      background: lightBg,
+                      color: accentColor,
                       padding: "0.4rem 0.8rem",
                       borderRadius: "6px",
                       fontSize: "0.85rem",
@@ -607,12 +615,12 @@ export default function TemplateBrowser({ showNotification }) {
       {!loading && filteredTemplates?.length === 0 && (
         <div
           style={{
-            background: "#f8f9ff",
+            background: lightBg,
             border: "2px dashed #667eea",
             borderRadius: "10px",
             padding: "3rem",
             textAlign: "center",
-            color: "#666",
+            color: mutedColor,
           }}
         >
           <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>🔍</div>

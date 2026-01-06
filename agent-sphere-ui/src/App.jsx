@@ -291,7 +291,7 @@ export default function App() {
   const [homeStatus, setHomeStatus] = useState(null);
   const [financialData, setFinancialData] = useState(null);
   const [notifications, setNotifications] = useState([]);
-  const [darkMode, setDarkMode] = useState(false);
+  const [theme, setTheme] = useState('matrix'); // 'matrix', 'cyber', 'classic'
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [visualBuilderWorkflow, setVisualBuilderWorkflow] = useState(null);
   const [newWorkflow, setNewWorkflow] = useState({
@@ -316,6 +316,12 @@ export default function App() {
   const [selectedCustomAgent, setSelectedCustomAgent] = useState(null);
   const [customAgentChatHistory, setCustomAgentChatHistory] = useState({});
   const [customAgentMessage, setCustomAgentMessage] = useState("");
+
+  // Sub-tab states for grouped navigation
+  const [chatSubTab, setChatSubTab] = useState("agents"); // agents, orchestrator
+  const [agentsSubTab, setAgentsSubTab] = useState("marketplace"); // marketplace, custom, templates
+  const [builderSubTab, setBuilderSubTab] = useState("visual"); // visual, tools, workflows
+  const [insightsSubTab, setInsightsSubTab] = useState("analytics"); // analytics, testing
 
   const socketRef = useRef(null);
   const recognitionRef = useRef(null);
@@ -495,8 +501,8 @@ export default function App() {
   }, [activeTab]);
 
   useEffect(() => {
-    document.body.classList.toggle("dark-mode", darkMode);
-  }, [darkMode]);
+    document.body.className = `theme-${theme}`;
+  }, [theme]);
 
   const handleSystemUpdate = (data) => {
     if (data.type === "home_update") {
@@ -1393,13 +1399,22 @@ export default function App() {
   };
 
   return (
-    <div className={`app ${darkMode ? "dark" : ""}`}>
+    <div className={`app theme-${theme}`}>
       <header className="header">
         <h1>🤖 Multi-Agent AI System</h1>
         <p>Home Automation • Calendar • Finance • Workflows</p>
         <div className="header-controls">
-          <button onClick={() => setDarkMode(!darkMode)} className="icon-btn">
-            {darkMode ? "☀️" : "🌙"}
+          <button
+            onClick={() => {
+              const themes = ['matrix', 'cyber', 'classic'];
+              const currentIndex = themes.indexOf(theme);
+              const nextIndex = (currentIndex + 1) % themes.length;
+              setTheme(themes[nextIndex]);
+            }}
+            className="icon-btn"
+            title={`Current: ${theme.charAt(0).toUpperCase() + theme.slice(1)} theme`}
+          >
+            {theme === 'matrix' ? '🟢' : theme === 'cyber' ? '🔵' : '🟣'}
           </button>
           <button
             onClick={() => startVoiceInput("header")}
@@ -1425,32 +1440,21 @@ export default function App() {
       )}
 
       <nav className="navigation">
-        <button
-          className={`nav-btn ${activeTab === "orchestrator" ? "active" : ""}`}
-          onClick={() => setActiveTab("orchestrator")}
-        >
-          🧠 Smart Assistant
-        </button>
-        <button
-          className={`nav-btn ${activeTab === "agents" ? "active" : ""}`}
-          onClick={() => setActiveTab("agents")}
-        >
-          💬 Agents
-        </button>
-        <button
-          className={`nav-btn ${activeTab === "customAgents" ? "active" : ""}`}
-          onClick={() => {
-            setActiveTab("customAgents");
-            fetchCustomAgents();
-          }}
-        >
-          🤖 Custom Agents
-        </button>
+        {/* Primary User Features */}
         <button
           className={`nav-btn ${activeTab === "home" ? "active" : ""}`}
           onClick={() => setActiveTab("home")}
         >
-          🏠 Home
+          🏠 Dashboard
+        </button>
+        <button
+          className={`nav-btn ${["orchestrator", "agents"].includes(activeTab) ? "active" : ""}`}
+          onClick={() => {
+            setActiveTab("agents");
+            setChatSubTab("agents");
+          }}
+        >
+          💬 Chat
         </button>
         <button
           className={`nav-btn ${activeTab === "calendar" ? "active" : ""}`}
@@ -1458,91 +1462,126 @@ export default function App() {
         >
           📅 Calendar
         </button>
-
         <button
           className={`nav-btn ${activeTab === "finance" ? "active" : ""}`}
           onClick={() => setActiveTab("finance")}
         >
           💰 Finance
         </button>
+
+        {/* Development Section */}
         <button
-          className={`nav-btn ${activeTab === "workflows" ? "active" : ""}`}
-          onClick={() => setActiveTab("workflows")}
+          className={`nav-btn ${["agentMarketplace", "customAgents", "templates"].includes(activeTab) ? "active" : ""}`}
+          onClick={() => {
+            setActiveTab("agentMarketplace");
+            setAgentsSubTab("marketplace");
+          }}
         >
-          ⚙️ Workflows
+          🤖 Agents
         </button>
         <button
-          className={`nav-btn ${
-            activeTab === "agentMarketplace" ? "active" : ""
-          }`}
-          onClick={() => setActiveTab("agentMarketplace")}
+          className={`nav-btn ${["builder", "toolBuilder", "workflows"].includes(activeTab) ? "active" : ""}`}
+          onClick={() => {
+            setActiveTab("builder");
+            setBuilderSubTab("visual");
+          }}
         >
-          🛠️ Agent Marketplace
-        </button>
-        <button
-          className={`nav-btn ${activeTab === "toolBuilder" ? "active" : ""}`}
-          onClick={() => setActiveTab("toolBuilder")}
-        >
-          🔧 Tool Builder
-        </button>
-        <button
-          className={`nav-btn ${activeTab === "builder" ? "active" : ""}`}
-          onClick={() => setActiveTab("builder")}
-        >
-          🎨 Visual Builder
-        </button>
-        <button
-          className={`nav-btn ${activeTab === "analytics" ? "active" : ""}`}
-          onClick={() => setActiveTab("analytics")}
-        >
-          📊 Analytics
+          🔧 Builder
         </button>
 
+        {/* Quality & Insights */}
         <button
-          className={`nav-btn ${activeTab === "testing" ? "active" : ""}`}
-          onClick={() => setActiveTab("testing")}
+          className={`nav-btn ${["analytics", "testing"].includes(activeTab) ? "active" : ""}`}
+          onClick={() => {
+            setActiveTab("analytics");
+            setInsightsSubTab("analytics");
+          }}
         >
-          🧪 Testing
-        </button>
-
-        <button
-          className={`nav-btn ${activeTab === "templates" ? "active" : ""}`}
-          onClick={() => setActiveTab("templates")}
-        >
-          📚 Templates
+          📊 Insights
         </button>
       </nav>
       <main className="content">
-        {activeTab === "builder" && (
-          <WorkflowBuilder initialWorkflow={visualBuilderWorkflow} />
-        )}
-        {activeTab === "agentMarketplace" && (
-          <AgentBuilder
-            activeTab={activeTab}
-            loading={loading}
-            showNotification={showNotification}
-          />
-        )}
-        {activeTab === "toolBuilder" && (
+        {/* AGENTS TAB - Grouped */}
+        {["agentMarketplace", "customAgents", "templates"].includes(activeTab) && (
           <section className="section">
-            <ToolBuilder showNotification={showNotification} />
-          </section>
-        )}
+            {/* Sub-navigation */}
+            <div style={{
+              display: "flex",
+              gap: "0.5rem",
+              marginBottom: "1.5rem",
+              borderBottom: theme === 'classic' ? "2px solid #e0e0e0" : theme === 'cyber' ? "2px solid rgba(0, 217, 255, 0.3)" : "2px solid rgba(0, 255, 65, 0.3)",
+              paddingBottom: "0.5rem"
+            }}>
+              <button
+                onClick={() => {
+                  setAgentsSubTab("marketplace");
+                  setActiveTab("agentMarketplace");
+                }}
+                style={{
+                  padding: "0.5rem 1rem",
+                  background: agentsSubTab === "marketplace" ? (theme === 'classic' ? "#667eea" : theme === 'cyber' ? "#00d9ff" : "#00ff41") : "transparent",
+                  color: agentsSubTab === "marketplace" ? (theme === 'classic' ? "white" : "#0d0208") : (theme === 'classic' ? "#333" : "rgba(255, 255, 255, 0.7)"),
+                  border: "none",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  fontWeight: agentsSubTab === "marketplace" ? "bold" : "normal",
+                  transition: "all 0.3s ease",
+                }}
+              >
+                🛠️ Marketplace
+              </button>
+              <button
+                onClick={() => {
+                  setAgentsSubTab("custom");
+                  setActiveTab("customAgents");
+                  fetchCustomAgents();
+                }}
+                style={{
+                  padding: "0.5rem 1rem",
+                  background: agentsSubTab === "custom" ? (theme === 'classic' ? "#667eea" : theme === 'cyber' ? "#00d9ff" : "#00ff41") : "transparent",
+                  color: agentsSubTab === "custom" ? (theme === 'classic' ? "white" : "#0d0208") : (theme === 'classic' ? "#333" : "rgba(255, 255, 255, 0.7)"),
+                  border: "none",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  fontWeight: agentsSubTab === "custom" ? "bold" : "normal",
+                  transition: "all 0.3s ease",
+                }}
+              >
+                🤖 My Agents
+              </button>
+              <button
+                onClick={() => {
+                  setAgentsSubTab("templates");
+                  setActiveTab("templates");
+                }}
+                style={{
+                  padding: "0.5rem 1rem",
+                  background: agentsSubTab === "templates" ? (theme === 'classic' ? "#667eea" : theme === 'cyber' ? "#00d9ff" : "#00ff41") : "transparent",
+                  color: agentsSubTab === "templates" ? (theme === 'classic' ? "white" : "#0d0208") : (theme === 'classic' ? "#333" : "rgba(255, 255, 255, 0.7)"),
+                  border: "none",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  fontWeight: agentsSubTab === "templates" ? "bold" : "normal",
+                  transition: "all 0.3s ease",
+                }}
+              >
+                📚 Templates
+              </button>
+            </div>
 
-        {activeTab === "analytics" && (
-          <AnalyticsDashboard showNotification={showNotification} />
-        )}
-
-        {activeTab === "testing" && (
-          <TestRunner showNotification={showNotification} />
-        )}
-
-        {activeTab === "templates" && (
-          <TemplateBrowser showNotification={showNotification} />
-        )}
-
-        {activeTab === "customAgents" && (
-          <section className="section">
+            {/* Render content based on sub-tab */}
+            {agentsSubTab === "marketplace" && (
+              <AgentBuilder
+                activeTab={activeTab}
+                loading={loading}
+                showNotification={showNotification}
+              />
+            )}
+            {agentsSubTab === "templates" && (
+              <TemplateBrowser showNotification={showNotification} theme={theme} />
+            )}
+            {agentsSubTab === "custom" && (
+              <>
             <h2>🤖 Custom Agents</h2>
 
             <div
@@ -1556,21 +1595,21 @@ export default function App() {
               {/* Custom Agents List */}
               <div
                 style={{
-                  background: "#f8f9ff",
+                  background: theme === 'classic' ? "#f8f9ff" : "rgba(0, 0, 0, 0.4)",
                   borderRadius: "10px",
-                  border: "2px solid #e0e0e0",
+                  border: theme === 'classic' ? "2px solid #e0e0e0" : theme === 'cyber' ? "2px solid rgba(0, 217, 255, 0.3)" : "2px solid rgba(0, 255, 65, 0.3)",
                   padding: "1rem",
                   maxHeight: "600px",
                   overflowY: "auto",
                 }}
               >
                 <h3
-                  style={{ marginTop: 0, color: "#667eea", fontSize: "1.1rem" }}
+                  style={{ marginTop: 0, color: theme === 'classic' ? "#667eea" : theme === 'cyber' ? "#00d9ff" : "#00ff41", fontSize: "1.1rem" }}
                 >
                   Your Agents
                 </h3>
                 {customAgentsList.length === 0 ? (
-                  <p style={{ color: "#999", fontSize: "0.9rem" }}>
+                  <p style={{ color: theme === 'classic' ? "#999" : "rgba(255, 255, 255, 0.5)", fontSize: "0.9rem" }}>
                     No custom agents yet. Create one in Agent Marketplace tab.
                   </p>
                 ) : (
@@ -1595,17 +1634,16 @@ export default function App() {
                         }}
                         style={{
                           padding: "0.75rem",
-                          border:
-                            selectedCustomAgent === agent.id
-                              ? "2px solid #667eea"
-                              : "2px solid #ddd",
+                          border: selectedCustomAgent === agent.id
+                            ? theme === 'classic' ? "2px solid #667eea" : theme === 'cyber' ? "2px solid #00d9ff" : "2px solid #00ff41"
+                            : theme === 'classic' ? "2px solid #ddd" : "2px solid rgba(255, 255, 255, 0.2)",
                           borderRadius: "8px",
-                          background:
-                            selectedCustomAgent === agent.id
-                              ? "#667eea"
-                              : "white",
-                          color:
-                            selectedCustomAgent === agent.id ? "white" : "#333",
+                          background: selectedCustomAgent === agent.id
+                            ? (theme === 'classic' ? "#667eea" : theme === 'cyber' ? "#00d9ff" : "#00ff41")
+                            : (theme === 'classic' ? "white" : "rgba(0, 0, 0, 0.3)"),
+                          color: selectedCustomAgent === agent.id
+                            ? (theme === 'classic' ? "white" : "#0d0208")
+                            : (theme === 'classic' ? "#333" : "rgba(255, 255, 255, 0.9)"),
                           cursor: "pointer",
                           textAlign: "left",
                           transition: "all 0.3s ease",
@@ -1631,11 +1669,14 @@ export default function App() {
                   display: "flex",
                   flexDirection: "column",
                   gap: 0,
-                  background:
-                    "linear-gradient(135deg, #5a4a8a 0%, #463d73 100%)",
+                  background: theme === 'classic'
+                    ? "linear-gradient(135deg, #5a4a8a 0%, #463d73 100%)"
+                    : theme === 'cyber'
+                    ? "rgba(10, 14, 39, 0.8)"
+                    : "rgba(13, 2, 8, 0.8)",
                   borderRadius: "10px",
                   overflow: "hidden",
-                  border: "2px solid #e0e0e0",
+                  border: theme === 'classic' ? "2px solid #e0e0e0" : theme === 'cyber' ? "2px solid rgba(0, 217, 255, 0.3)" : "2px solid rgba(0, 255, 65, 0.3)",
                 }}
               >
                 {selectedCustomAgent ? (
@@ -1784,130 +1825,543 @@ export default function App() {
                 )}
               </div>
             </div>
+              </>
+            )}
           </section>
         )}
-        {activeTab === "agents" && (
+
+        {/* BUILDER TAB - Grouped */}
+        {["builder", "toolBuilder", "workflows"].includes(activeTab) && (
           <section className="section">
-            <h2>AI Agents Chat</h2>
-
-            <div className="agent-selector">
-              {agents.map((agent) => (
-                <button
-                  key={agent.id}
-                  className={`agent-btn ${
-                    selectedAgent === agent.id ? "active" : ""
-                  }`}
-                  onClick={() => {
-                    setSelectedAgent(agent.id);
-                  }}
-                >
-                  <strong>{agent.name}</strong>
-                  <p>{agent.role}</p>
-                  <span className={`status ${agent.status}`}>
-                    {agent.status}
-                  </span>
-                </button>
-              ))}
-            </div>
-
-            <div className="chat-container">
-              <div
+            {/* Sub-navigation */}
+            <div style={{
+              display: "flex",
+              gap: "0.5rem",
+              marginBottom: "1.5rem",
+              borderBottom: theme === 'classic' ? "2px solid #e0e0e0" : theme === 'cyber' ? "2px solid rgba(0, 217, 255, 0.3)" : "2px solid rgba(0, 255, 65, 0.3)",
+              paddingBottom: "0.5rem"
+            }}>
+              <button
+                onClick={() => {
+                  setBuilderSubTab("visual");
+                  setActiveTab("builder");
+                }}
                 style={{
                   padding: "0.5rem 1rem",
-                  borderBottom: "1px solid rgba(255,255,255,0.2)",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
+                  background: builderSubTab === "visual" ? (theme === 'classic' ? "#667eea" : theme === 'cyber' ? "#00d9ff" : "#00ff41") : "transparent",
+                  color: builderSubTab === "visual" ? (theme === 'classic' ? "white" : "#0d0208") : (theme === 'classic' ? "#333" : "rgba(255, 255, 255, 0.7)"),
+                  border: "none",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  fontWeight: builderSubTab === "visual" ? "bold" : "normal",
+                  transition: "all 0.3s ease",
                 }}
               >
-                <span
-                  style={{ color: "rgba(255,255,255,0.7)", fontSize: "0.9rem" }}
-                >
-                  💬 {agents.find((a) => a.id === selectedAgent)?.name}'s Chat
-                </span>
-                <button
-                  onClick={clearChatHistory}
-                  style={{
-                    background: "transparent",
-                    border: "1px solid rgba(255,255,255,0.3)",
-                    color: "rgba(255,255,255,0.7)",
-                    padding: "0.3rem 0.8rem",
-                    borderRadius: "4px",
-                    cursor: "pointer",
-                    fontSize: "0.8rem",
-                    transition: "all 0.3s ease",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.background = "rgba(255,255,255,0.1)";
-                    e.target.style.borderColor = "rgba(255,255,255,0.5)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.background = "transparent";
-                    e.target.style.borderColor = "rgba(255,255,255,0.3)";
-                  }}
-                >
-                  🗑️ Clear
-                </button>
-              </div>
-              <div className="chat-history" ref={chatHistoryRef}>
-                {getChatHistory().length === 0 && (
-                  <div className="empty-chat">
-                    Start a conversation with{" "}
-                    {agents.find((a) => a.id === selectedAgent)?.name ||
-                      "an agent"}
-                  </div>
-                )}
-                {getChatHistory().map((msg, idx) => (
-                  <div key={idx} className={`chat-message ${msg.type}-modern`}>
-                    <strong>
-                      {msg.type === "user" ? "👤 You" : "🤖 Agent"}
-                    </strong>
-                    {msg.type === "user" ? (
-                      <p>{msg.text}</p>
-                    ) : (
-                      <div>{formatAgentResponse(msg.text)}</div>
-                    )}
-                  </div>
-                ))}
-                {loading && (
-                  <div className="chat-message assistant-modern">
-                    <strong>🤖 Agent</strong>
-                    <p className="typing">Thinking...</p>
-                  </div>
-                )}
-              </div>
-              <form onSubmit={sendMessage} className="chat-form">
-                <input
-                  type="text"
-                  placeholder="Ask me anything..."
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  disabled={loading}
-                />
-                <button type="submit" disabled={loading || !message.trim()}>
-                  {loading ? "⏳" : "📤"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => startVoiceInput("chat")}
-                  className={`voice-btn-chat ${
-                    voiceEnabled ? "recording" : ""
-                  }`}
-                  disabled={loading}
-                  title="Click to record voice message"
-                >
-                  {voiceEnabled ? "⏹️ Stop" : "🎤 Record"}
-                </button>
-              </form>
+                🎨 Visual Builder
+              </button>
+              <button
+                onClick={() => {
+                  setBuilderSubTab("tools");
+                  setActiveTab("toolBuilder");
+                }}
+                style={{
+                  padding: "0.5rem 1rem",
+                  background: builderSubTab === "tools" ? (theme === 'classic' ? "#667eea" : theme === 'cyber' ? "#00d9ff" : "#00ff41") : "transparent",
+                  color: builderSubTab === "tools" ? (theme === 'classic' ? "white" : "#0d0208") : (theme === 'classic' ? "#333" : "rgba(255, 255, 255, 0.7)"),
+                  border: "none",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  fontWeight: builderSubTab === "tools" ? "bold" : "normal",
+                  transition: "all 0.3s ease",
+                }}
+              >
+                🔧 Tool Builder
+              </button>
+              <button
+                onClick={() => {
+                  setBuilderSubTab("workflows");
+                  setActiveTab("workflows");
+                }}
+                style={{
+                  padding: "0.5rem 1rem",
+                  background: builderSubTab === "workflows" ? (theme === 'classic' ? "#667eea" : theme === 'cyber' ? "#00d9ff" : "#00ff41") : "transparent",
+                  color: builderSubTab === "workflows" ? (theme === 'classic' ? "white" : "#0d0208") : (theme === 'classic' ? "#333" : "rgba(255, 255, 255, 0.7)"),
+                  border: "none",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  fontWeight: builderSubTab === "workflows" ? "bold" : "normal",
+                  transition: "all 0.3s ease",
+                }}
+              >
+                ⚙️ Workflows
+              </button>
             </div>
+
+            {/* Render content based on sub-tab */}
+            {builderSubTab === "visual" && (
+              <WorkflowBuilder initialWorkflow={visualBuilderWorkflow} />
+            )}
+            {builderSubTab === "tools" && (
+              <ToolBuilder showNotification={showNotification} />
+            )}
+            {builderSubTab === "workflows" && (
+              <div>
+                <h2>⚙️ Workflow Management</h2>
+
+                <div className="workflow-section">
+                  <h3>Create New Workflow or Use Template</h3>
+
+                  {/* Template Selection */}
+                  <div style={{ marginBottom: "1.5rem" }}>
+                    <label
+                      style={{
+                        display: "block",
+                        marginBottom: "0.5rem",
+                        fontWeight: "bold",
+                      }}
+                    >
+                      Quick Start - Select Template:
+                    </label>
+                    <div className="templates-grid">
+                      {templates.map((template) => (
+                        <div key={template.id} className="template-card">
+                          <h4>{template.name}</h4>
+                          <p>{template.description}</p>
+                          <small>📋 {template.tasks} tasks</small>
+                          <button
+                            onClick={() => createFromTemplate(template.id)}
+                            disabled={loading}
+                            className="primary-btn"
+                            style={{ width: "100%" }}
+                          >
+                            {loading ? "Creating..." : "✨ Use Template"}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Manual Creation */}
+                  <hr style={{ margin: "2rem 0", borderColor: "#ccc" }} />
+
+                  <h4>Or Create From Scratch</h4>
+                  <p style={{ color: "#666", fontSize: "0.9rem" }}>
+                    💡 Tip: Create a workflow here, then open it in the Visual
+                    Builder to add tasks with a visual interface.
+                  </p>
+
+                  <form className="form-group">
+                    <input
+                      type="text"
+                      placeholder="Workflow ID (e.g., morning_routine)"
+                      value={newWorkflow.workflow_id}
+                      onChange={(e) =>
+                        setNewWorkflow({
+                          ...newWorkflow,
+                          workflow_id: e.target.value,
+                        })
+                      }
+                    />
+                    <input
+                      type="text"
+                      placeholder="Workflow Name"
+                      value={newWorkflow.name}
+                      onChange={(e) =>
+                        setNewWorkflow({ ...newWorkflow, name: e.target.value })
+                      }
+                    />
+                    <input
+                      type="text"
+                      placeholder="Description (optional)"
+                      value={newWorkflow.description}
+                      onChange={(e) =>
+                        setNewWorkflow({
+                          ...newWorkflow,
+                          description: e.target.value,
+                        })
+                      }
+                    />
+                    <button
+                      type="button"
+                      onClick={createWorkflow}
+                      className="primary-btn"
+                      style={{ width: "100%" }}
+                    >
+                      📝 Create & Open in Builder
+                    </button>
+                  </form>
+                </div>
+
+                <div className="workflow-section">
+                  <h3>Your Workflows</h3>
+                  {workflows.length === 0 ? (
+                    <p className="empty-state">
+                      No workflows yet. Create one above!
+                    </p>
+                  ) : (
+                    <div className="workflows-list">
+                      {workflows.map((workflow) => (
+                        <div key={workflow.workflow_id} className="workflow-item">
+                          <div className="workflow-info">
+                            <h4>{workflow.name}</h4>
+                            <p>{workflow.description}</p>
+                            <small>
+                              Status: <strong>{workflow.status}</strong> | Tasks:{" "}
+                              {workflow.completed_tasks}/{workflow.task_count}
+                            </small>
+                          </div>
+                          <div className="workflow-actions">
+                            <button
+                              onClick={() => executeWorkflow(workflow.workflow_id)}
+                              disabled={loading}
+                              className="primary-btn"
+                            >
+                              {loading ? "⏳" : "▶️"} Execute
+                            </button>
+                            <button
+                              onClick={() =>
+                                openWorkflowInVisualBuilder(workflow.workflow_id)
+                              }
+                              className="secondary-btn"
+                            >
+                              🎨 View Builder
+                            </button>
+                            <button
+                              onClick={() => exportWorkflow(workflow.workflow_id)}
+                              className="secondary-btn"
+                            >
+                              💾 Export
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </section>
         )}
-        {activeTab === "orchestrator" && (
+
+        {/* INSIGHTS TAB - Grouped */}
+        {["analytics", "testing"].includes(activeTab) && (
           <section className="section">
+            {/* Sub-navigation */}
+            <div style={{
+              display: "flex",
+              gap: "0.5rem",
+              marginBottom: "1.5rem",
+              borderBottom: theme === 'classic' ? "2px solid #e0e0e0" : theme === 'cyber' ? "2px solid rgba(0, 217, 255, 0.3)" : "2px solid rgba(0, 255, 65, 0.3)",
+              paddingBottom: "0.5rem"
+            }}>
+              <button
+                onClick={() => {
+                  setInsightsSubTab("analytics");
+                  setActiveTab("analytics");
+                }}
+                style={{
+                  padding: "0.5rem 1rem",
+                  background: insightsSubTab === "analytics" ? (theme === 'classic' ? "#667eea" : theme === 'cyber' ? "#00d9ff" : "#00ff41") : "transparent",
+                  color: insightsSubTab === "analytics" ? (theme === 'classic' ? "white" : "#0d0208") : (theme === 'classic' ? "#333" : "rgba(255, 255, 255, 0.7)"),
+                  border: "none",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  fontWeight: insightsSubTab === "analytics" ? "bold" : "normal",
+                  transition: "all 0.3s ease",
+                }}
+              >
+                📊 Analytics
+              </button>
+              <button
+                onClick={() => {
+                  setInsightsSubTab("testing");
+                  setActiveTab("testing");
+                }}
+                style={{
+                  padding: "0.5rem 1rem",
+                  background: insightsSubTab === "testing" ? (theme === 'classic' ? "#667eea" : theme === 'cyber' ? "#00d9ff" : "#00ff41") : "transparent",
+                  color: insightsSubTab === "testing" ? (theme === 'classic' ? "white" : "#0d0208") : (theme === 'classic' ? "#333" : "rgba(255, 255, 255, 0.7)"),
+                  border: "none",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  fontWeight: insightsSubTab === "testing" ? "bold" : "normal",
+                  transition: "all 0.3s ease",
+                }}
+              >
+                🧪 Testing
+              </button>
+            </div>
+
+            {/* Render content based on sub-tab */}
+            {insightsSubTab === "analytics" && (
+              <AnalyticsDashboard showNotification={showNotification} theme={theme} />
+            )}
+            {insightsSubTab === "testing" && (
+              <TestRunner showNotification={showNotification} theme={theme} />
+            )}
+          </section>
+        )}
+
+        {["agents", "orchestrator"].includes(activeTab) && (
+          <section className="section">
+            {/* Sub-navigation */}
+            <div style={{
+              display: "flex",
+              gap: "0.5rem",
+              marginBottom: "1.5rem",
+              borderBottom: theme === 'classic' ? "2px solid #e0e0e0" : theme === 'cyber' ? "2px solid rgba(0, 217, 255, 0.3)" : "2px solid rgba(0, 255, 65, 0.3)",
+              paddingBottom: "0.5rem"
+            }}>
+              <button
+                onClick={() => {
+                  setChatSubTab("agents");
+                  setActiveTab("agents");
+                }}
+                style={{
+                  padding: "0.5rem 1rem",
+                  background: chatSubTab === "agents" ? (theme === 'classic' ? "#667eea" : theme === 'cyber' ? "#00d9ff" : "#00ff41") : "transparent",
+                  color: chatSubTab === "agents" ? (theme === 'classic' ? "white" : "#0d0208") : (theme === 'classic' ? "#333" : "rgba(255, 255, 255, 0.7)"),
+                  border: "none",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  fontWeight: chatSubTab === "agents" ? "bold" : "normal",
+                  transition: "all 0.3s ease",
+                }}
+              >
+                💬 Agent Chat
+              </button>
+              <button
+                onClick={() => {
+                  setChatSubTab("orchestrator");
+                  setActiveTab("orchestrator");
+                }}
+                style={{
+                  padding: "0.5rem 1rem",
+                  background: chatSubTab === "orchestrator" ? (theme === 'classic' ? "#667eea" : theme === 'cyber' ? "#00d9ff" : "#00ff41") : "transparent",
+                  color: chatSubTab === "orchestrator" ? (theme === 'classic' ? "white" : "#0d0208") : (theme === 'classic' ? "#333" : "rgba(255, 255, 255, 0.7)"),
+                  border: "none",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  fontWeight: chatSubTab === "orchestrator" ? "bold" : "normal",
+                  transition: "all 0.3s ease",
+                }}
+              >
+                🧠 Smart Assistant
+              </button>
+            </div>
+
+            {/* Render content based on sub-tab */}
+            {chatSubTab === "agents" && (
+              <>
+            <h2>🤖 AI Agents Chat</h2>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "250px 1fr",
+                gap: "1.5rem",
+                minHeight: "600px",
+              }}
+            >
+              {/* Agent List Sidebar */}
+              <div
+                style={{
+                  background: theme === 'classic' ? "#f8f9ff" : "rgba(0, 0, 0, 0.4)",
+                  borderRadius: "10px",
+                  border: theme === 'classic' ? "2px solid #e0e0e0" : theme === 'cyber' ? "2px solid rgba(0, 217, 255, 0.3)" : "2px solid rgba(0, 255, 65, 0.3)",
+                  padding: "1rem",
+                  maxHeight: "600px",
+                  overflowY: "auto",
+                }}
+              >
+                <h3
+                  style={{ marginTop: 0, color: theme === 'classic' ? "#667eea" : theme === 'cyber' ? "#00d9ff" : "#00ff41", fontSize: "1.1rem" }}
+                >
+                  Available Agents
+                </h3>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.5rem",
+                  }}
+                >
+                  {agents.map((agent) => (
+                    <button
+                      key={agent.id}
+                      onClick={() => setSelectedAgent(agent.id)}
+                      style={{
+                        padding: "0.75rem",
+                        border: selectedAgent === agent.id
+                          ? theme === 'classic' ? "2px solid #667eea" : theme === 'cyber' ? "2px solid #00d9ff" : "2px solid #00ff41"
+                          : theme === 'classic' ? "2px solid #ddd" : "2px solid rgba(255, 255, 255, 0.2)",
+                        borderRadius: "8px",
+                        background: selectedAgent === agent.id
+                          ? (theme === 'classic' ? "#667eea" : theme === 'cyber' ? "#00d9ff" : "#00ff41")
+                          : (theme === 'classic' ? "white" : "rgba(0, 0, 0, 0.3)"),
+                        color: selectedAgent === agent.id
+                          ? (theme === 'classic' ? "white" : "#0d0208")
+                          : (theme === 'classic' ? "#333" : "rgba(255, 255, 255, 0.9)"),
+                        cursor: "pointer",
+                        textAlign: "left",
+                        transition: "all 0.3s ease",
+                        fontWeight: selectedAgent === agent.id ? "bold" : "normal",
+                      }}
+                    >
+                      <div style={{ fontSize: "0.9rem", marginBottom: "0.25rem" }}>
+                        {agent.name}
+                      </div>
+                      <div style={{ fontSize: "0.75rem", opacity: 0.8 }}>
+                        {agent.role}
+                      </div>
+                      <div style={{ fontSize: "0.7rem", marginTop: "0.25rem" }}>
+                        <span className={`status ${agent.status}`} style={{
+                          padding: "0.15rem 0.4rem",
+                          borderRadius: "3px",
+                          background: agent.status === 'active'
+                            ? (theme === 'classic' ? 'rgba(76, 175, 80, 0.2)' : 'rgba(0, 255, 65, 0.2)')
+                            : 'rgba(128, 128, 128, 0.2)',
+                          fontSize: "0.65rem",
+                        }}>
+                          {agent.status}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Chat Interface */}
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 0,
+                  background: theme === 'classic'
+                    ? "linear-gradient(135deg, #5a4a8a 0%, #463d73 100%)"
+                    : theme === 'cyber'
+                    ? "rgba(10, 14, 39, 0.8)"
+                    : "rgba(13, 2, 8, 0.8)",
+                  borderRadius: "10px",
+                  overflow: "hidden",
+                  border: theme === 'classic' ? "2px solid #e0e0e0" : theme === 'cyber' ? "2px solid rgba(0, 217, 255, 0.3)" : "2px solid rgba(0, 255, 65, 0.3)",
+                }}
+              >
+                {/* Agent Info Header */}
+                <div
+                  style={{
+                    padding: "1rem",
+                    background: "rgba(0,0,0,0.2)",
+                    borderBottom: "1px solid rgba(255,255,255,0.2)",
+                    color: "white",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: "1.1rem" }}>
+                      {agents.find((a) => a.id === selectedAgent)?.name}
+                    </h3>
+                    <p
+                      style={{
+                        margin: "0.25rem 0 0 0",
+                        fontSize: "0.85rem",
+                        opacity: 0.8,
+                      }}
+                    >
+                      {agents.find((a) => a.id === selectedAgent)?.role}
+                    </p>
+                  </div>
+                  <button
+                    onClick={clearChatHistory}
+                    style={{
+                      background: "transparent",
+                      border: "1px solid rgba(255,255,255,0.3)",
+                      color: "rgba(255,255,255,0.7)",
+                      padding: "0.5rem 1rem",
+                      borderRadius: "6px",
+                      cursor: "pointer",
+                      fontSize: "0.85rem",
+                      transition: "all 0.3s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.background = "rgba(255,255,255,0.1)";
+                      e.target.style.borderColor = "rgba(255,255,255,0.5)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.background = "transparent";
+                      e.target.style.borderColor = "rgba(255,255,255,0.3)";
+                    }}
+                  >
+                    🗑️ Clear Chat
+                  </button>
+                </div>
+
+                {/* Chat History */}
+                <div className="chat-history" ref={chatHistoryRef} style={{ flex: 1, padding: "1.5rem" }}>
+                  {getChatHistory().length === 0 && (
+                    <div className="empty-chat">
+                      Start a conversation with{" "}
+                      {agents.find((a) => a.id === selectedAgent)?.name ||
+                        "an agent"}
+                    </div>
+                  )}
+                  {getChatHistory().map((msg, idx) => (
+                    <div key={idx} className={`chat-message ${msg.type}-modern`}>
+                      <strong>
+                        {msg.type === "user" ? "👤 You" : "🤖 Agent"}
+                      </strong>
+                      {msg.type === "user" ? (
+                        <p>{msg.text}</p>
+                      ) : (
+                        <div>{formatAgentResponse(msg.text)}</div>
+                      )}
+                    </div>
+                  ))}
+                  {loading && (
+                    <div className="chat-message assistant-modern">
+                      <strong>🤖 Agent</strong>
+                      <p className="typing">Thinking...</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Chat Input Form */}
+                <form onSubmit={sendMessage} className="chat-form" style={{ padding: "1rem", borderTop: "1px solid rgba(255,255,255,0.2)" }}>
+                  <input
+                    type="text"
+                    placeholder="Ask me anything..."
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    disabled={loading}
+                  />
+                  <button type="submit" disabled={loading || !message.trim()}>
+                    {loading ? "⏳" : "📤"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => startVoiceInput("chat")}
+                    className={`voice-btn-chat ${
+                      voiceEnabled ? "recording" : ""
+                    }`}
+                    disabled={loading}
+                    title="Click to record voice message"
+                  >
+                    {voiceEnabled ? "⏹️ Stop" : "🎤 Record"}
+                  </button>
+                </form>
+              </div>
+            </div>
+              </>
+            )}
+
+            {chatSubTab === "orchestrator" && (
+              <>
             <h2>🧠 Smart Multi-Agent Assistant</h2>
             <p
               style={{
-                color: "#666",
+                color: theme === 'classic' ? "#666" : "rgba(255, 255, 255, 0.7)",
                 marginBottom: "1.5rem",
                 fontSize: "0.95rem",
               }}
@@ -2199,6 +2653,8 @@ export default function App() {
                   </div>
                 </div>
               </div>
+            )}
+              </>
             )}
           </section>
         )}
@@ -2553,14 +3009,14 @@ export default function App() {
                         key={event.id}
                         style={{
                           padding: "0.75rem",
-                          background: "#f0f4ff",
+                          background: theme === 'classic' ? "#f0f4ff" : "rgba(0, 255, 65, 0.05)",
                           borderRadius: "8px",
-                          borderLeft: "4px solid #667eea",
+                          borderLeft: theme === 'classic' ? "4px solid #667eea" : theme === 'cyber' ? "4px solid #00d9ff" : "4px solid #00ff41",
                         }}
                       >
                         <strong
                           style={{
-                            color: "#667eea",
+                            color: theme === 'classic' ? "#667eea" : theme === 'cyber' ? "#00d9ff" : "#00ff41",
                             display: "block",
                             marginBottom: "0.25rem",
                           }}
@@ -2569,7 +3025,7 @@ export default function App() {
                         </strong>
                         <small
                           style={{
-                            color: "#666",
+                            color: theme === 'classic' ? "#666" : "rgba(255, 255, 255, 0.6)",
                             display: "block",
                             marginBottom: "0.25rem",
                           }}
@@ -2588,7 +3044,7 @@ export default function App() {
                         {event.location && (
                           <small
                             style={{
-                              color: "#666",
+                              color: theme === 'classic' ? "#666" : "rgba(255, 255, 255, 0.6)",
                               display: "block",
                               marginBottom: "0.25rem",
                             }}
@@ -2597,7 +3053,7 @@ export default function App() {
                           </small>
                         )}
                         {event.attendees && event.attendees.length > 0 && (
-                          <small style={{ color: "#999", display: "block" }}>
+                          <small style={{ color: theme === 'classic' ? "#999" : "rgba(255, 255, 255, 0.5)", display: "block" }}>
                             👥 {event.attendees.length} attendee(s)
                           </small>
                         )}
@@ -2636,11 +3092,9 @@ export default function App() {
                         key={email.id}
                         style={{
                           padding: "0.75rem",
-                          background: email.read ? "#f5f5f5" : "#e3f2fd",
+                          background: theme === 'classic' ? (email.read ? "#f5f5f5" : "#e3f2fd") : "rgba(0, 255, 65, 0.05)",
                           borderRadius: "8px",
-                          borderLeft: `4px solid ${
-                            email.read ? "#999" : "#2196f3"
-                          }`,
+                          borderLeft: theme === 'classic' ? `4px solid ${email.read ? "#999" : "#2196f3"}` : theme === 'cyber' ? "4px solid #00d9ff" : "4px solid #00ff41",
                         }}
                       >
                         <div
@@ -2654,7 +3108,7 @@ export default function App() {
                           <div style={{ flex: 1 }}>
                             <strong
                               style={{
-                                color: "#333",
+                                color: theme === 'classic' ? "#333" : theme === 'cyber' ? "#00d9ff" : "#00ff41",
                                 display: "block",
                                 marginBottom: "0.25rem",
                                 fontWeight: email.read ? 500 : 700,
@@ -2664,14 +3118,14 @@ export default function App() {
                             </strong>
                             <small
                               style={{
-                                color: "#666",
+                                color: theme === 'classic' ? "#666" : "rgba(255, 255, 255, 0.6)",
                                 display: "block",
                                 marginBottom: "0.25rem",
                               }}
                             >
                               From: {email.from}
                             </small>
-                            <small style={{ color: "#999" }}>
+                            <small style={{ color: theme === 'classic' ? "#999" : "rgba(255, 255, 255, 0.5)" }}>
                               {new Date(email.date).toLocaleDateString()}
                             </small>
                           </div>
@@ -2840,142 +3294,6 @@ export default function App() {
                 </div>
               </>
             )}
-          </section>
-        )}
-        {activeTab === "workflows" && (
-          <section className="section">
-            <h2>⚙️ Workflow Management</h2>
-
-            <div className="workflow-section">
-              <h3>Create New Workflow or Use Template</h3>
-
-              {/* Template Selection */}
-              <div style={{ marginBottom: "1.5rem" }}>
-                <label
-                  style={{
-                    display: "block",
-                    marginBottom: "0.5rem",
-                    fontWeight: "bold",
-                  }}
-                >
-                  Quick Start - Select Template:
-                </label>
-                <div className="templates-grid">
-                  {templates.map((template) => (
-                    <div key={template.id} className="template-card">
-                      <h4>{template.name}</h4>
-                      <p>{template.description}</p>
-                      <small>📋 {template.tasks} tasks</small>
-                      <button
-                        onClick={() => createFromTemplate(template.id)}
-                        disabled={loading}
-                        className="primary-btn"
-                        style={{ width: "100%" }}
-                      >
-                        {loading ? "Creating..." : "✨ Use Template"}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Manual Creation */}
-              <hr style={{ margin: "2rem 0", borderColor: "#ccc" }} />
-
-              <h4>Or Create From Scratch</h4>
-              <p style={{ color: "#666", fontSize: "0.9rem" }}>
-                💡 Tip: Create a workflow here, then open it in the Visual
-                Builder to add tasks with a visual interface.
-              </p>
-
-              <form className="form-group">
-                <input
-                  type="text"
-                  placeholder="Workflow ID (e.g., morning_routine)"
-                  value={newWorkflow.workflow_id}
-                  onChange={(e) =>
-                    setNewWorkflow({
-                      ...newWorkflow,
-                      workflow_id: e.target.value,
-                    })
-                  }
-                />
-                <input
-                  type="text"
-                  placeholder="Workflow Name"
-                  value={newWorkflow.name}
-                  onChange={(e) =>
-                    setNewWorkflow({ ...newWorkflow, name: e.target.value })
-                  }
-                />
-                <input
-                  type="text"
-                  placeholder="Description (optional)"
-                  value={newWorkflow.description}
-                  onChange={(e) =>
-                    setNewWorkflow({
-                      ...newWorkflow,
-                      description: e.target.value,
-                    })
-                  }
-                />
-                <button
-                  type="button"
-                  onClick={createWorkflow}
-                  className="primary-btn"
-                  style={{ width: "100%" }}
-                >
-                  📝 Create & Open in Builder
-                </button>
-              </form>
-            </div>
-
-            <div className="workflow-section">
-              <h3>Your Workflows</h3>
-              {workflows.length === 0 ? (
-                <p className="empty-state">
-                  No workflows yet. Create one above!
-                </p>
-              ) : (
-                <div className="workflows-list">
-                  {workflows.map((workflow) => (
-                    <div key={workflow.workflow_id} className="workflow-item">
-                      <div className="workflow-info">
-                        <h4>{workflow.name}</h4>
-                        <p>{workflow.description}</p>
-                        <small>
-                          Status: <strong>{workflow.status}</strong> | Tasks:{" "}
-                          {workflow.completed_tasks}/{workflow.task_count}
-                        </small>
-                      </div>
-                      <div className="workflow-actions">
-                        <button
-                          onClick={() => executeWorkflow(workflow.workflow_id)}
-                          disabled={loading}
-                          className="primary-btn"
-                        >
-                          {loading ? "⏳" : "▶️"} Execute
-                        </button>
-                        <button
-                          onClick={() =>
-                            openWorkflowInVisualBuilder(workflow.workflow_id)
-                          }
-                          className="secondary-btn"
-                        >
-                          🎨 View Builder
-                        </button>
-                        <button
-                          onClick={() => exportWorkflow(workflow.workflow_id)}
-                          className="secondary-btn"
-                        >
-                          💾 Export
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
           </section>
         )}
       </main>

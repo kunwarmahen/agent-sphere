@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 
 const API_URL = "http://localhost:5000/api";
 
-export default function AnalyticsDashboard({ showNotification }) {
+export default function AnalyticsDashboard({ showNotification, theme = 'matrix' }) {
   const [dashboardData, setDashboardData] = useState(null);
   const [allAgentStats, setAllAgentStats] = useState([]);
   const [selectedAgent, setSelectedAgent] = useState(null);
@@ -70,6 +70,14 @@ export default function AnalyticsDashboard({ showNotification }) {
     return "Poor";
   };
 
+  // Theme colors
+  const accentColor = theme === 'classic' ? '#667eea' : theme === 'cyber' ? '#00d9ff' : '#00ff41';
+  const cardBg = theme === 'classic' ? 'white' : 'rgba(0, 0, 0, 0.4)';
+  const cardBorder = theme === 'classic' ? '#e0e0e0' : theme === 'cyber' ? 'rgba(0, 217, 255, 0.3)' : 'rgba(0, 255, 65, 0.3)';
+  const lightBg = theme === 'classic' ? '#f8f9ff' : 'rgba(0, 255, 65, 0.05)';
+  const textColor = theme === 'classic' ? '#333' : 'rgba(255, 255, 255, 0.9)';
+  const mutedColor = theme === 'classic' ? '#666' : 'rgba(255, 255, 255, 0.6)';
+
   return (
     <div style={{ padding: "2rem" }}>
       <h2 style={{ marginBottom: "2rem" }}>📊 Analytics Dashboard</h2>
@@ -86,11 +94,12 @@ export default function AnalyticsDashboard({ showNotification }) {
         >
           <div
             style={{
-              background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+              background: theme === 'classic' ? "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" : `linear-gradient(135deg, ${accentColor}22 0%, ${accentColor}11 100%)`,
               padding: "1.5rem",
               borderRadius: "12px",
-              color: "white",
+              color: theme === 'classic' ? "white" : accentColor,
               boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
+              border: theme === 'classic' ? 'none' : `1px solid ${cardBorder}`,
             }}
           >
             <div style={{ fontSize: "2rem", fontWeight: "bold" }}>
@@ -103,11 +112,12 @@ export default function AnalyticsDashboard({ showNotification }) {
 
           <div
             style={{
-              background: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
+              background: theme === 'classic' ? "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)" : `linear-gradient(135deg, ${accentColor}22 0%, ${accentColor}11 100%)`,
               padding: "1.5rem",
               borderRadius: "12px",
-              color: "white",
+              color: theme === 'classic' ? "white" : accentColor,
               boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
+              border: theme === 'classic' ? 'none' : `1px solid ${cardBorder}`,
             }}
           >
             <div style={{ fontSize: "2rem", fontWeight: "bold" }}>
@@ -120,11 +130,12 @@ export default function AnalyticsDashboard({ showNotification }) {
 
           <div
             style={{
-              background: "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)",
+              background: theme === 'classic' ? "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)" : `linear-gradient(135deg, ${accentColor}22 0%, ${accentColor}11 100%)`,
               padding: "1.5rem",
               borderRadius: "12px",
-              color: "white",
+              color: theme === 'classic' ? "white" : accentColor,
               boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
+              border: theme === 'classic' ? 'none' : `1px solid ${cardBorder}`,
             }}
           >
             <div style={{ fontSize: "2rem", fontWeight: "bold" }}>
@@ -164,23 +175,23 @@ export default function AnalyticsDashboard({ showNotification }) {
                     padding: "1rem",
                     background:
                       selectedAgent === agent.agent_id
-                        ? "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
-                        : "white",
-                    border: "2px solid #e0e0e0",
+                        ? (theme === 'classic' ? "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" : accentColor)
+                        : cardBg,
+                    border: `2px solid ${selectedAgent === agent.agent_id ? accentColor : cardBorder}`,
                     borderRadius: "10px",
                     cursor: "pointer",
                     transition: "all 0.3s ease",
-                    color: selectedAgent === agent.agent_id ? "white" : "#333",
+                    color: selectedAgent === agent.agent_id ? (theme === 'classic' ? "white" : "#0d0208") : textColor,
                   }}
                   onMouseEnter={(e) => {
                     if (selectedAgent !== agent.agent_id) {
-                      e.currentTarget.style.borderColor = "#667eea";
+                      e.currentTarget.style.borderColor = accentColor;
                       e.currentTarget.style.transform = "translateY(-2px)";
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (selectedAgent !== agent.agent_id) {
-                      e.currentTarget.style.borderColor = "#e0e0e0";
+                      e.currentTarget.style.borderColor = cardBorder;
                       e.currentTarget.style.transform = "none";
                     }
                   }}
@@ -237,8 +248,8 @@ export default function AnalyticsDashboard({ showNotification }) {
           {agentDetails ? (
             <div
               style={{
-                background: "white",
-                border: "2px solid #e0e0e0",
+                background: cardBg,
+                border: `2px solid ${cardBorder}`,
                 borderRadius: "10px",
                 padding: "1.5rem",
               }}
@@ -284,19 +295,19 @@ export default function AnalyticsDashboard({ showNotification }) {
                 <div
                   style={{
                     padding: "1rem",
-                    background: "#f8f9ff",
+                    background: lightBg,
                     borderRadius: "8px",
-                    border: "2px solid #e0e0e0",
+                    border: `2px solid ${cardBorder}`,
                   }}
                 >
-                  <div style={{ color: "#666", fontSize: "0.85rem" }}>
+                  <div style={{ color: mutedColor, fontSize: "0.85rem" }}>
                     Total Runs
                   </div>
                   <div
                     style={{
                       fontSize: "1.8rem",
                       fontWeight: "bold",
-                      color: "#667eea",
+                      color: accentColor,
                     }}
                   >
                     {agentDetails.total_executions}
@@ -306,19 +317,19 @@ export default function AnalyticsDashboard({ showNotification }) {
                 <div
                   style={{
                     padding: "1rem",
-                    background: "#f8f9ff",
+                    background: lightBg,
                     borderRadius: "8px",
-                    border: "2px solid #e0e0e0",
+                    border: `2px solid ${cardBorder}`,
                   }}
                 >
-                  <div style={{ color: "#666", fontSize: "0.85rem" }}>
+                  <div style={{ color: mutedColor, fontSize: "0.85rem" }}>
                     Avg Response
                   </div>
                   <div
                     style={{
                       fontSize: "1.8rem",
                       fontWeight: "bold",
-                      color: "#667eea",
+                      color: accentColor,
                     }}
                   >
                     {agentDetails.avg_response_time_ms}ms
@@ -328,19 +339,19 @@ export default function AnalyticsDashboard({ showNotification }) {
                 <div
                   style={{
                     padding: "1rem",
-                    background: "#fff3e0",
+                    background: theme === 'classic' ? "#fff3e0" : lightBg,
                     borderRadius: "8px",
-                    border: "2px solid #ffe0b2",
+                    border: theme === 'classic' ? "2px solid #ffe0b2" : `2px solid ${cardBorder}`,
                   }}
                 >
-                  <div style={{ color: "#666", fontSize: "0.85rem" }}>
+                  <div style={{ color: mutedColor, fontSize: "0.85rem" }}>
                     Total Errors
                   </div>
                   <div
                     style={{
                       fontSize: "1.8rem",
                       fontWeight: "bold",
-                      color: "#ff9800",
+                      color: theme === 'classic' ? "#ff9800" : accentColor,
                     }}
                   >
                     {agentDetails.total_errors}
@@ -350,19 +361,19 @@ export default function AnalyticsDashboard({ showNotification }) {
                 <div
                   style={{
                     padding: "1rem",
-                    background: "#f8f9ff",
+                    background: lightBg,
                     borderRadius: "8px",
-                    border: "2px solid #e0e0e0",
+                    border: `2px solid ${cardBorder}`,
                   }}
                 >
-                  <div style={{ color: "#666", fontSize: "0.85rem" }}>
+                  <div style={{ color: mutedColor, fontSize: "0.85rem" }}>
                     Tools Used
                   </div>
                   <div
                     style={{
                       fontSize: "1.8rem",
                       fontWeight: "bold",
-                      color: "#667eea",
+                      color: accentColor,
                     }}
                   >
                     {agentDetails.most_used_tools.length}
@@ -391,16 +402,16 @@ export default function AnalyticsDashboard({ showNotification }) {
                           justifyContent: "space-between",
                           alignItems: "center",
                           padding: "0.75rem",
-                          background: "#f8f9ff",
+                          background: lightBg,
                           borderRadius: "6px",
-                          border: "1px solid #e0e0e0",
+                          border: `1px solid ${cardBorder}`,
                         }}
                       >
-                        <span style={{ fontWeight: "500" }}>{tool.tool}</span>
+                        <span style={{ fontWeight: "500", color: textColor }}>{tool.tool}</span>
                         <span
                           style={{
-                            background: "#667eea",
-                            color: "white",
+                            background: accentColor,
+                            color: theme === 'classic' ? "white" : "#0d0208",
                             padding: "0.25rem 0.75rem",
                             borderRadius: "12px",
                             fontSize: "0.85rem",
@@ -439,11 +450,11 @@ export default function AnalyticsDashboard({ showNotification }) {
                             justifyContent: "space-between",
                             alignItems: "center",
                             padding: "0.5rem",
-                            background: "#f8f9ff",
+                            background: lightBg,
                             borderRadius: "6px",
                           }}
                         >
-                          <span style={{ fontSize: "0.9rem" }}>{date}</span>
+                          <span style={{ fontSize: "0.9rem", color: textColor }}>{date}</span>
                           <div
                             style={{
                               display: "flex",
@@ -455,12 +466,12 @@ export default function AnalyticsDashboard({ showNotification }) {
                               style={{
                                 width: `${Math.min(count * 3, 150)}px`,
                                 height: "8px",
-                                background: "#667eea",
+                                background: accentColor,
                                 borderRadius: "4px",
                               }}
                             />
                             <span
-                              style={{ fontWeight: "bold", minWidth: "30px" }}
+                              style={{ fontWeight: "bold", minWidth: "30px", color: textColor }}
                             >
                               {count}
                             </span>
@@ -491,21 +502,21 @@ export default function AnalyticsDashboard({ showNotification }) {
                         key={index}
                         style={{
                           padding: "0.75rem",
-                          background: "#ffebee",
-                          border: "1px solid #ffcdd2",
+                          background: theme === 'classic' ? "#ffebee" : "rgba(255, 0, 0, 0.1)",
+                          border: theme === 'classic' ? "1px solid #ffcdd2" : "1px solid rgba(255, 0, 0, 0.3)",
                           borderRadius: "6px",
                         }}
                       >
                         <div
                           style={{
                             fontSize: "0.75rem",
-                            color: "#666",
+                            color: mutedColor,
                             marginBottom: "0.25rem",
                           }}
                         >
                           {new Date(error.time).toLocaleString()}
                         </div>
-                        <div style={{ fontSize: "0.9rem", color: "#c62828" }}>
+                        <div style={{ fontSize: "0.9rem", color: theme === 'classic' ? "#c62828" : "#ff6b6b" }}>
                           {error.error}
                         </div>
                       </div>
@@ -517,12 +528,12 @@ export default function AnalyticsDashboard({ showNotification }) {
           ) : (
             <div
               style={{
-                background: "#f8f9ff",
-                border: "2px dashed #667eea",
+                background: lightBg,
+                border: `2px dashed ${accentColor}`,
                 borderRadius: "10px",
                 padding: "3rem",
                 textAlign: "center",
-                color: "#666",
+                color: mutedColor,
               }}
             >
               <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>📊</div>
