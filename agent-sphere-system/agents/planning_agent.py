@@ -34,11 +34,11 @@ class LLMSequentialOrchestrator:
         except Exception as e:
             return f"Error calling LLM: {str(e)}"
     
-    def analyze_request(self, user_request: str) -> Dict:
+    def analyze_request(self, user_request: str, memory_context: str = "") -> Dict:
         """Analyze request to determine which agents are needed"""
         available_agents = list(self.agents.keys())
         available_custom_agents = []
-        
+
         if self.custom_agents_manager:
             custom_agents = self.custom_agents_manager.custom_agents.values()
             available_custom_agents = [
@@ -46,13 +46,17 @@ class LLMSequentialOrchestrator:
                 for a in custom_agents
                 if a.get("status") == "published"
             ]
-        
+
         custom_agents_text = ""
         if available_custom_agents:
             custom_agents_text = "\n\nCustom Agents:\n"
             for agent in available_custom_agents:
                 custom_agents_text += f"- {agent['name']} ({agent['id']}): {agent['role']}\n"
-        
+
+        memory_section = ""
+        if memory_context:
+            memory_section = f"\nUser Context (long-term memory — use this to inform routing and tasks):\n{memory_context}\n"
+
         analysis_prompt = f"""You are an intelligent task orchestrator. Analyze the user request and determine:
 1. Which agent(s) should be called and in what order
 2. The reasoning for this sequence
@@ -62,8 +66,7 @@ Available Built-in AGENTS:
 - home: Control smart home devices, lights, thermostat, security
 - calendar: Manage calendar events, emails, scheduling
 - finance: Handle budgets, transactions, investments, financial goals
-{custom_agents_text}
-
+{custom_agents_text}{memory_section}
 User Request: "{user_request}"
 
 IMPORTANT: When responding with agent names, use the EXACT names or IDs from the lists above.

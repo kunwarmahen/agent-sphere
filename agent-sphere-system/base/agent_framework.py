@@ -155,6 +155,23 @@ After using a tool, wait for the result before deciding the next action."""
         
         if self.system_instructions:
             base_prompt += f"\n\nAdditional Instructions:\n{self.system_instructions}"
+
+        # Inject long-term memories into the system prompt.
+        # Always include global "orchestrator" memories (user facts/preferences)
+        # plus any memories specific to this agent.
+        try:
+            from memory.memory_manager import memory_manager
+            # Global memories stored under "orchestrator"
+            global_block = memory_manager.format_for_prompt("orchestrator")
+            # Agent-specific memories (only when different from orchestrator)
+            agent_block = ""
+            if self.name != "orchestrator":
+                agent_block = memory_manager.format_for_prompt(self.name)
+            combined = "\n\n".join(b for b in [global_block, agent_block] if b)
+            if combined:
+                base_prompt += f"\n\n{combined}"
+        except Exception:
+            pass
         
         for iteration in range(self.max_iterations):
             if verbose:

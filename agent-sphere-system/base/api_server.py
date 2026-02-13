@@ -43,6 +43,7 @@ from scheduler.schedule_intent import (
 from llm.llm_config import llm_config, PROVIDERS
 from llm.llm_router import llm_router
 from webhook.webhook_manager import webhook_manager
+from memory.memory_manager import memory_manager
 
 
 # Initialize Flask app
@@ -845,6 +846,41 @@ def execute_orchestrated_query():
         if not query:
             return jsonify({"error": "Query is required"}), 400
 
+        # ── /remember command ───────────────────────────────────────────────
+        if query.lower().startswith("/remember "):
+            fact = query[len("/remember "):].strip()
+            agent_id = data.get('agent_id', 'orchestrator')
+            result = memory_manager.add(agent_id=agent_id, content=fact, source="command", importance=4)
+            if result.get("success"):
+                reply = f"Got it, I'll remember that: *\"{fact}\"*"
+            else:
+                reply = f"Couldn't save that: {result.get('error', 'unknown error')}"
+            _store_conversation(session_key, query, reply)
+            return jsonify({
+                "query": query,
+                "execution": {"final_response": reply},
+                "timestamp": datetime.now().isoformat(),
+            }), 200
+
+        # ── /forget command ─────────────────────────────────────────────────
+        if query.lower().startswith("/forget "):
+            fact = query[len("/forget "):].strip()
+            agent_id = data.get('agent_id', 'orchestrator')
+            memories = memory_manager.get_all(agent_id)
+            removed = [m for m in memories if fact.lower() in m["content"].lower()]
+            for m in removed:
+                memory_manager.delete(agent_id, m["id"])
+            if removed:
+                reply = f"Forgotten {len(removed)} memor{'y' if len(removed)==1 else 'ies'} matching \"{fact}\"."
+            else:
+                reply = f"No memories found matching \"{fact}\"."
+            _store_conversation(session_key, query, reply)
+            return jsonify({
+                "query": query,
+                "execution": {"final_response": reply},
+                "timestamp": datetime.now().isoformat(),
+            }), 200
+
         # ── Schedule confirmation flow ──────────────────────────────────────
         if has_pending(session_key):
             if is_confirmation(query):
@@ -888,15 +924,29 @@ def execute_orchestrated_query():
                 "timestamp": datetime.now().isoformat()
             }), 200
 
-        # Step 1: Analyze the request
-        analysis = orchestrator.analyze_request(query)
+        # Step 1: Analyze the request — inject memory context so the planner
+        # is aware of user facts when deciding which agents to call and how.
+        memory_context = memory_manager.format_for_prompt("orchestrator")
+        analysis = orchestrator.analyze_request(query, memory_context=memory_context)
 
         # Step 2: Execute the plan sequentially
         execution_result = orchestrator.execute_sequential_plan(analysis)
         
         # Store in conversation history
         _store_conversation(session_key, query, execution_result["final_response"])
-        
+
+        # Auto-extract memorable facts from this exchange (non-blocking)
+        try:
+            agent_id = data.get('agent_id', 'orchestrator')
+            import threading
+            threading.Thread(
+                target=memory_manager.extract_and_store,
+                args=(agent_id, query, execution_result["final_response"]),
+                daemon=True,
+            ).start()
+        except Exception:
+            pass
+
         # Broadcast update
         broadcast_update('orchestrator_execution', {
             'query': query,
@@ -2193,6 +2243,70 @@ def trigger_webhook(token):
         "log_id": log_entry["id"],
         "duration_ms": duration_ms,
     }), status_code
+
+
+# ============================================================================
+# MEMORY ENDPOINTS
+# ============================================================================
+
+@app.route('/api/memory/agents', methods=['GET'])
+def list_memory_agents():
+    """List all agent IDs that have stored memories"""
+    try:
+        agents = memory_manager.list_agents()
+        return jsonify({"agents": agents}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/memory/<agent_id>', methods=['GET'])
+def get_memories(agent_id):
+    """Get all memories for an agent"""
+    try:
+        memories = memory_manager.get_all(agent_id)
+        return jsonify({"agent_id": agent_id, "memories": memories, "total": len(memories)}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/memory/<agent_id>', methods=['POST'])
+def add_memory(agent_id):
+    """Manually add a memory for an agent"""
+    try:
+        data = request.json
+        content = data.get('content', '').strip()
+        if not content:
+            return jsonify({"error": "content is required"}), 400
+        result = memory_manager.add(
+            agent_id=agent_id,
+            content=content,
+            category=data.get('category', 'fact'),
+            source=data.get('source', 'manual'),
+            importance=data.get('importance', 3),
+        )
+        return jsonify(result), 201 if result.get('success') else 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/memory/<agent_id>/<memory_id>', methods=['DELETE'])
+def delete_memory(agent_id, memory_id):
+    """Delete a specific memory"""
+    try:
+        result = memory_manager.delete(agent_id, memory_id)
+        return jsonify(result), 200 if result.get('success') else 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/memory/<agent_id>', methods=['DELETE'])
+def clear_memories(agent_id):
+    """Clear all memories for an agent"""
+    try:
+        result = memory_manager.clear(agent_id)
+        return jsonify(result), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # ============================================================================

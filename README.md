@@ -14,6 +14,7 @@ A complete, self-hosted AI agent platform with a web UI for home automation, cal
 - **Scheduled Tasks** — Natural language cron/interval/one-shot job creation; jobs survive restarts
 - **Webhooks** — Unique HTTP trigger URLs per agent; external services POST to fire any agent
 - **Multi-LLM Support** — Ollama (local), Anthropic Claude, OpenAI GPT, Google Gemini with automatic failover
+- **Persistent Long-Term Memory** — Agents remember facts and context across sessions; `/remember` command, auto-extraction, per-agent memory store
 - **Analytics Dashboard** — Track performance, response times, and usage metrics
 - **Testing Framework** — Automated test suites and quick ad-hoc testing
 - **Real API Integrations** — Home Assistant, Google Calendar, Gmail
@@ -47,11 +48,15 @@ agent-sphere/
 │   │   └── schedule_intent.py    # LLM-based natural language intent detection
 │   ├── webhook/                  # HTTP trigger system
 │   │   └── webhook_manager.py    # Token management, execution log
+│   ├── memory/                   # Persistent long-term memory
+│   │   └── memory_manager.py     # Per-agent JSON store, auto-extraction, prompt injection
 │   ├── workflow/                 # Workflow engine
 │   ├── analytics/                # Analytics tracking
 │   ├── testing/                  # Agent testing framework
 │   ├── templates/                # Agent templates
-│   ├── data/                     # Runtime data (configs, logs, job store)
+│   ├── data/
+│   │   ├── memory/               # Per-agent memory JSON files
+│   │   └── ...                   # Other runtime data (configs, logs, job store)
 │   └── requirements.txt
 │
 └── agent-sphere-ui/              # Frontend React application
@@ -62,6 +67,7 @@ agent-sphere/
     │   │   ├── ScheduleManager.jsx   # Cron job UI
     │   │   ├── WebhookManager.jsx    # Webhook UI
     │   │   ├── LLMSettings.jsx       # Multi-LLM config UI
+    │   │   ├── MemoryManager.jsx     # Long-term memory UI
     │   │   ├── AgentBuilder.jsx
     │   │   ├── WorkflowBuilder.jsx
     │   │   ├── ToolBuilder.jsx
@@ -169,6 +175,7 @@ npm start
 | 🔧 **Builder** | Visual workflow, tool builder, workflow manager |
 | 📊 **Insights** | Analytics and testing |
 | 🧠 **LLM** | Provider config, API keys, failover order |
+| 🧩 **Memory** | View, add, and delete per-agent long-term memories |
 
 **UI Themes:** 🟢 Matrix · 🔵 Cyber · 🟣 Classic
 
@@ -328,6 +335,86 @@ curl -X POST http://localhost:5000/api/llm/failover \
   -H "Content-Type: application/json" \
   -d '{"order": ["ollama", "anthropic", "openai"]}'
 ```
+
+---
+
+## 🧩 Long-Term Memory
+
+Agents remember facts, preferences, and context **across sessions**. Memory is automatically injected into each agent's system prompt so it is always available without any extra steps.
+
+### How it works
+
+1. Every chat turn is processed in the background — the LLM extracts memorable facts and stores them automatically (source: *Auto-extracted*, importance 2).
+2. You can store facts explicitly using the `/remember` chat command (source: */remember*, importance 3).
+3. Stored memories are sorted by importance and injected at the top of the agent's system prompt on every request.
+4. Long conversations are summarised and stored as memory entries (source: *Compacted*, importance 4).
+
+### Chat commands
+
+```
+/remember My cat is called Luna and she eats dry food only
+/forget Luna
+```
+
+`/remember` saves the fact under the **orchestrator** scope (shared across all agents).
+`/forget <keyword>` removes all memories that contain the keyword.
+
+### Memory tab (UI)
+
+Navigate to **🧩 Memory** to:
+
+- Browse memories per agent (orchestrator, home, calendar, finance, custom agents)
+- Add memories manually with category and importance
+- Delete individual entries or clear all for an agent
+
+### Memory categories
+
+| Category | Colour | Use |
+|---|---|---|
+| **fact** | Cyan | Factual statements about the user or environment |
+| **preference** | Purple | User preferences and habits |
+| **context** | Amber | Situational context |
+| **summary** | Green | Compacted conversation summaries |
+
+### Importance levels
+
+| Stars | Meaning |
+|---|---|
+| ★★★★★ | Critical — always included |
+| ★★★★☆ | High — compacted summaries |
+| ★★★☆☆ | Normal — `/remember` command |
+| ★★☆☆☆ | Low — auto-extracted facts |
+| ★☆☆☆☆ | Informational |
+
+Up to **15 memories** (highest importance first) are injected per prompt. Up to **200 entries** are stored per agent before oldest low-importance ones are pruned.
+
+### Memory API
+
+```bash
+# List all memories for an agent
+GET  /api/memory/orchestrator
+
+# Add a memory
+POST /api/memory/orchestrator
+{
+  "content": "User is vegetarian",
+  "category": "preference",
+  "importance": 4
+}
+
+# Delete a memory
+DELETE /api/memory/orchestrator/<memory_id>
+
+# Clear all memories for an agent
+DELETE /api/memory/orchestrator
+
+# List agents that have stored memories
+GET  /api/memory/agents
+```
+
+### Storage
+
+Memories are stored as JSON in `agent-sphere-system/data/memory/<agent_id>.json`. The file is human-readable and can be edited directly if needed.
 
 ---
 
@@ -1143,6 +1230,7 @@ React components are in `agent-sphere-ui/src/components/`
 - `ScheduleManager.jsx` - Scheduled jobs UI
 - `WebhookManager.jsx` - Webhook management UI
 - `LLMSettings.jsx` - Multi-LLM configuration UI
+- `MemoryManager.jsx` - Long-term memory browser and editor
 - `AnalyticsDashboard.jsx` - Analytics dashboard
 - `TestRunner.jsx` - Testing interface
 - `TemplateBrowser.jsx` - Agent templates
@@ -1205,6 +1293,7 @@ python -c "from agents.home_agent import home_agent; \
 9. Set up scheduled tasks via natural language chat
 10. Create webhooks to trigger agents from external services
 11. Configure multi-LLM failover for reliability
+12. Use `/remember` in chat to build up persistent agent memory
 
 **Monitor & Optimize:**
 12. Track agent performance in Analytics

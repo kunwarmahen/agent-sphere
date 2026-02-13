@@ -10,6 +10,7 @@ import HomeAutomation from "./components/HomeAutomation";
 import ScheduleManager from "./components/ScheduleManager";
 import LLMSettings from "./components/LLMSettings";
 import WebhookManager from "./components/WebhookManager";
+import MemoryManager from "./components/MemoryManager";
 
 import "./App.css";
 
@@ -1534,6 +1535,13 @@ export default function App() {
         >
           🔗 Webhooks
         </button>
+
+        <button
+          className={`nav-btn ${activeTab === "memory" ? "active" : ""}`}
+          onClick={() => setActiveTab("memory")}
+        >
+          🧩 Memory
+        </button>
       </nav>
       <main className="content">
         {/* LLM SETTINGS TAB */}
@@ -1547,6 +1555,13 @@ export default function App() {
         {activeTab === "webhooks" && (
           <section className="section" style={{ padding: 0 }}>
             <WebhookManager theme={theme} showNotification={showNotification} />
+          </section>
+        )}
+
+        {/* MEMORY TAB */}
+        {activeTab === "memory" && (
+          <section className="section" style={{ padding: 0 }}>
+            <MemoryManager theme={theme} showNotification={showNotification} />
           </section>
         )}
 
