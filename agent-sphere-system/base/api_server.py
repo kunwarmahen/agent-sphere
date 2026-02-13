@@ -42,6 +42,7 @@ from scheduler.schedule_intent import (
 )
 from llm.llm_config import llm_config, PROVIDERS
 from llm.llm_router import llm_router
+from webhook.webhook_manager import webhook_manager
 
 
 # Initialize Flask app
@@ -2062,6 +2063,136 @@ def schedule_history():
         return jsonify({"history": history, "total": len(history)}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+# ============================================================================
+# WEBHOOK ENDPOINTS
+# ============================================================================
+
+@app.route('/api/webhooks', methods=['GET'])
+def list_webhooks():
+    """List all registered webhooks"""
+    try:
+        hooks = webhook_manager.list_all()
+        return jsonify({"webhooks": hooks, "total": len(hooks)}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/webhooks', methods=['POST'])
+def create_webhook():
+    """Register a new webhook"""
+    try:
+        data = request.json
+        name = data.get('name', '').strip()
+        agent_id = data.get('agent_id', 'orchestrator').strip()
+        prompt_template = data.get('prompt_template', '').strip()
+        if not name or not prompt_template:
+            return jsonify({"error": "name and prompt_template are required"}), 400
+        result = webhook_manager.create(
+            name=name,
+            agent_id=agent_id,
+            prompt_template=prompt_template,
+            description=data.get('description', ''),
+            workflow_id=data.get('workflow_id'),
+        )
+        broadcast_update('webhook_created', result.get('webhook', {}))
+        return jsonify(result), 201 if result.get('success') else 400
+    except Exception as e:
+        logger.error(f"Error creating webhook: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/webhooks/<token>', methods=['DELETE'])
+def delete_webhook(token):
+    try:
+        result = webhook_manager.delete(token)
+        if result.get('success'):
+            broadcast_update('webhook_deleted', {'token': token})
+        return jsonify(result), 200 if result.get('success') else 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/webhooks/<token>/toggle', methods=['POST'])
+def toggle_webhook(token):
+    try:
+        enabled = request.json.get('enabled', True)
+        result = webhook_manager.toggle(token, enabled)
+        return jsonify(result), 200 if result.get('success') else 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/webhooks/<token>/regenerate', methods=['POST'])
+def regenerate_webhook_token(token):
+    try:
+        result = webhook_manager.regenerate_token(token)
+        return jsonify(result), 200 if result.get('success') else 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/webhooks/log', methods=['GET'])
+def webhook_log():
+    try:
+        token = request.args.get('token')
+        limit = request.args.get('limit', 50, type=int)
+        entries = webhook_manager.get_log(token=token, limit=limit)
+        return jsonify({"log": entries, "total": len(entries)}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/trigger/<token>', methods=['POST'])
+def trigger_webhook(token):
+    """External HTTP trigger endpoint — external services POST here."""
+    import time
+    start = time.time()
+    hook = webhook_manager.get(token)
+    if not hook:
+        return jsonify({"error": "Webhook not found"}), 404
+    if not hook.get('enabled', True):
+        return jsonify({"error": "Webhook is disabled"}), 403
+
+    payload = request.json or {}
+    # Accept query params as additional payload
+    payload.update({k: v for k, v in request.args.items()})
+
+    prompt = webhook_manager.build_prompt(hook, payload)
+    success = False
+    result_text = ""
+    try:
+        analysis = orchestrator.analyze_request(prompt)
+        execution = orchestrator.execute_sequential_plan(analysis)
+        result_text = execution.get('final_response', '')
+        success = True
+        broadcast_update('webhook_triggered', {
+            'token': token,
+            'name': hook['name'],
+            'prompt': prompt[:200],
+            'result': result_text[:300],
+        })
+    except Exception as e:
+        result_text = str(e)
+        logger.error(f"Webhook execution error ({token}): {e}")
+
+    duration_ms = int((time.time() - start) * 1000)
+    log_entry = webhook_manager.record_trigger(
+        token=token,
+        payload=payload,
+        result=result_text,
+        success=success,
+        duration_ms=duration_ms,
+    )
+
+    status_code = 200 if success else 500
+    return jsonify({
+        "success": success,
+        "result": result_text,
+        "log_id": log_entry["id"],
+        "duration_ms": duration_ms,
+    }), status_code
 
 
 # ============================================================================

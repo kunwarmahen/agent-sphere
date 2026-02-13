@@ -1,24 +1,26 @@
-# Multi-Agent AI System
+# Agent Sphere
 
-A complete AI agent framework with web UI for home automation, calendar/email management, and financial planning, powered by **Ollama Qwen2.5:14b**.
+A complete, self-hosted AI agent platform with a web UI for home automation, calendar/email management, financial planning, scheduled automation, webhook triggers, and multi-LLM support.
 
 ## 🎯 Overview
 
-This project features:
+- **Core Agent Framework** — Reasoning loop with tool usage
+- **Specialized Agents** — Home Assistant, Google Calendar/Gmail, Finance
+- **Smart Multi-Agent Orchestrator** — Routes queries to the right agents automatically
+- **Custom Agent Builder** — Create and publish your own AI agents via UI or code
+- **Agent Marketplace** — Browse and deploy pre-built agent templates
+- **Visual Workflow Builder** — Drag-and-drop multi-agent workflow design
+- **Tool Builder** — Create custom tools and attach them to any agent
+- **Scheduled Tasks** — Natural language cron/interval/one-shot job creation; jobs survive restarts
+- **Webhooks** — Unique HTTP trigger URLs per agent; external services POST to fire any agent
+- **Multi-LLM Support** — Ollama (local), Anthropic Claude, OpenAI GPT, Google Gemini with automatic failover
+- **Analytics Dashboard** — Track performance, response times, and usage metrics
+- **Testing Framework** — Automated test suites and quick ad-hoc testing
+- **Real API Integrations** — Home Assistant, Google Calendar, Gmail
+- **Web UI Dashboard** — React-based interface with Matrix / Cyber / Classic themes
+- **REST API + WebSocket** — Flask backend with real-time updates
 
-- **Core Agent Framework** - Reasoning loop with tool usage
-- **Specialized Agents** - Home Assistant, Google Calendar/Gmail, Finance
-- **Custom Agent Builder** - Create and publish your own AI agents
-- **Agent Marketplace** - Browse and use pre-built agent templates
-- **Smart Multi-Agent Assistant** - Orchestrates multiple agents automatically
-- **Visual Workflow Builder** - Drag-and-drop workflow design
-- **Tool Builder** - Create custom tools for agents
-- **Analytics Dashboard** - Track performance and usage metrics
-- **Testing Framework** - Automated testing and quality assurance
-- **Real API Integrations** - Home Assistant, Google Calendar, Gmail
-- **Web UI Dashboard** - React-based interface with Matrix/Cyber/Classic themes
-- **REST API Server** - Flask backend with WebSocket support
-- **Local LLM Integration** - Ollama-based reasoning
+---
 
 ## 📁 Project Structure
 
@@ -26,29 +28,51 @@ This project features:
 agent-sphere/
 ├── agent-sphere-system/          # Backend Python application
 │   ├── base/
-│   │   ├── agent_framework.py    # Core Agent & Tool classes
-│   │   └── api_server.py         # Flask REST API server
+│   │   ├── agent_framework.py    # Core Agent & Tool classes (LLM-agnostic)
+│   │   └── api_server.py         # Flask REST API + WebSocket server
 │   ├── agents/
 │   │   ├── home_agent.py         # Home Assistant integration
 │   │   ├── google/
-│   │   │   ├── google_auth.py    # Google OAuth handler
-│   │   │   ├── gmail_agent.py    # Gmail API integration
-│   │   │   ├── google_calendar_agent.py  # Calendar API integration
-│   │   │   └── google_unified_agent.py   # Combined Gmail + Calendar
-│   │   ├── finance_agent.py      # Financial planning agent
-│   │   └── custom_agents.py      # Custom agent builder
+│   │   │   ├── google_auth.py
+│   │   │   ├── gmail_agent.py
+│   │   │   ├── google_calendar_agent.py
+│   │   │   └── google_unified_agent.py
+│   │   ├── finance_agent.py
+│   │   └── custom_agents.py
+│   ├── llm/                      # Multi-LLM router
+│   │   ├── llm_config.py         # Provider config & API key storage
+│   │   └── llm_router.py         # Unified interface + failover
+│   ├── scheduler/                # Cron/scheduled task engine
+│   │   ├── scheduler_engine.py   # APScheduler with SQLite persistence
+│   │   └── schedule_intent.py    # LLM-based natural language intent detection
+│   ├── webhook/                  # HTTP trigger system
+│   │   └── webhook_manager.py    # Token management, execution log
 │   ├── workflow/                 # Workflow engine
 │   ├── analytics/                # Analytics tracking
 │   ├── testing/                  # Agent testing framework
-│   └── templates/                # Agent templates
+│   ├── templates/                # Agent templates
+│   ├── data/                     # Runtime data (configs, logs, job store)
+│   └── requirements.txt
 │
 └── agent-sphere-ui/              # Frontend React application
     ├── src/
-    │   ├── App.jsx               # Main application
-    │   ├── components/           # React components
-    │   └── App.css              # Styles
+    │   ├── App.jsx
+    │   ├── components/
+    │   │   ├── HomeAutomation.jsx
+    │   │   ├── ScheduleManager.jsx   # Cron job UI
+    │   │   ├── WebhookManager.jsx    # Webhook UI
+    │   │   ├── LLMSettings.jsx       # Multi-LLM config UI
+    │   │   ├── AgentBuilder.jsx
+    │   │   ├── WorkflowBuilder.jsx
+    │   │   ├── ToolBuilder.jsx
+    │   │   ├── AnalyticsDashboard.jsx
+    │   │   ├── TestRunner.jsx
+    │   │   └── TemplateBrowser.jsx
+    │   └── App.css
     └── package.json
 ```
+
+---
 
 ## ⚙️ Installation
 
@@ -56,11 +80,11 @@ agent-sphere/
 
 - Python 3.8+
 - Node.js 16+ and npm
-- Ollama with Qwen2.5:14b model
+- Ollama with at least one model pulled (optional if using a cloud LLM)
 - Home Assistant instance (optional)
-- Google Cloud Platform account (for Calendar/Gmail)
+- Google Cloud Platform account (for Calendar/Gmail, optional)
 
-### Step 1: Install Ollama
+### Step 1: Ollama (local LLM)
 
 Download from [ollama.ai](https://ollama.ai)
 
@@ -69,143 +93,243 @@ ollama pull qwen2.5:14b
 ollama serve
 ```
 
-Keep Ollama running in the background on `http://localhost:11434`
+Runs on `http://localhost:11434` by default. You can change the URL later in the 🧠 LLM Settings tab.
 
-### Step 2: Install Backend Dependencies
+### Step 2: Backend
 
 ```bash
 cd agent-sphere-system
 pip install -r requirements.txt
 ```
 
-**Required packages:**
-- flask
-- flask-cors
-- flask-socketio
-- google-auth
-- google-auth-oauthlib
-- google-api-python-client
-- requests
-- python-dotenv
-
-### Step 3: Install Frontend Dependencies
+### Step 3: Frontend
 
 ```bash
 cd agent-sphere-ui
 npm install
 ```
 
+---
+
 ## 🔧 Configuration
 
-### Home Assistant Setup
+### Home Assistant
 
-1. Get your Home Assistant URL and create a Long-Lived Access Token:
-   - Go to your Home Assistant → Profile → Long-Lived Access Tokens
-   - Click "Create Token"
-   - Copy the token
-
-2. Create `.env` file in `agent-sphere-system/`:
+1. In Home Assistant go to **Profile → Long-Lived Access Tokens → Create Token**.
+2. Create `agent-sphere-system/.env`:
 
 ```bash
 HA_BASE_URL=http://your-home-assistant:8123/api
-HA_ACCESS_TOKEN=your_long_lived_access_token_here
-```
-
-### Google Calendar & Gmail Setup
-
-1. **Create Google Cloud Project:**
-   - Go to [Google Cloud Console](https://console.cloud.google.com/)
-   - Create new project
-   - Enable APIs: Google Calendar API, Gmail API
-
-2. **Create OAuth Credentials:**
-   - Go to "APIs & Services" → "Credentials"
-   - Click "Create Credentials" → "OAuth client ID"
-   - Application type: "Desktop app"
-   - Download the JSON file
-
-3. **Configure Credentials:**
-   - Rename downloaded file to `credentials.json`
-   - Place in `agent-sphere-system/` directory
-   - **DO NOT commit this file to git** (already in .gitignore)
-
-4. **First-time OAuth Flow:**
-   - On first run, a browser window will open
-   - Sign in with your Google account
-   - Grant permissions for Calendar and Gmail access
-   - A `token.json` file will be created automatically
-   - **DO NOT commit token.json to git**
-
-### Environment Variables (Optional)
-
-Create `agent-sphere-system/.env`:
-
-```bash
-# Home Assistant
-HA_BASE_URL=http://localhost:8123/api
 HA_ACCESS_TOKEN=your_token_here
-
-# Ollama (defaults shown)
-OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=qwen2.5:14b
 ```
 
-## 🚀 Running the Application
+### Google Calendar & Gmail
 
-### Start Backend Server
+1. Create a Google Cloud project and enable the **Google Calendar API** and **Gmail API**.
+2. Create an OAuth 2.0 credential (Desktop app) and download the JSON file.
+3. Rename it to `credentials.json` and place it in `agent-sphere-system/`.
+4. On first run a browser window opens for OAuth. A `token.json` is created automatically.
+
+> **Never commit `credentials.json` or `token.json`** — they are already in `.gitignore`.
+
+### Cloud LLM providers (optional)
+
+Configure directly in the UI under **🧠 LLM Settings** after starting the server. Keys are stored locally in `data/llm_config.json` and never sent externally.
+
+---
+
+## 🚀 Running
 
 ```bash
+# Terminal 1 — backend
 cd agent-sphere-system
 python -m base.api_server
-```
 
-Server runs on `http://localhost:5000`
-
-**API Endpoints:**
-- `/api/agents/<agent_id>/chat` - Chat with agents
-- `/api/home/status` - Home automation status
-- `/api/calendar/events` - Calendar events
-- `/api/calendar/emails` - Gmail messages
-- `/api/workflows/execute` - Run workflows
-
-### Start Frontend UI
-
-```bash
+# Terminal 2 — frontend
 cd agent-sphere-ui
 npm start
 ```
 
-UI opens at `http://localhost:3000`
+- Backend: `http://localhost:5000`
+- Frontend: `http://localhost:3000`
 
-### Access the Dashboard
+---
 
-Open browser to `http://localhost:3000` and you'll see:
+## 🗺️ Navigation
 
-**Main Navigation:**
-- 🏠 **Dashboard** - Home automation control center
-- 💬 **Chat** - Talk to agents or use Smart Assistant
-  - 💬 Agent Chat - Direct chat with individual agents
-  - 🧠 Smart Assistant - Multi-agent orchestrator
-- 📅 **Calendar** - View events and emails
-- 💰 **Finance** - Budget tracking and financial planning
+| Tab | Description |
+|---|---|
+| 🏠 **Home** | Home Assistant control center |
+| 💬 **Chat / Orchestrator** | Direct agent chat + Smart multi-agent assistant |
+| 📅 **Calendar** | Events and email via Google |
+| 💰 **Finance** | Budget and expense tracking |
+| ⏰ **Schedules** | Create and manage scheduled jobs |
+| 🔗 **Webhooks** | HTTP trigger URLs for agents |
+| 🤖 **Agents** | Marketplace, custom agents, templates |
+| 🔧 **Builder** | Visual workflow, tool builder, workflow manager |
+| 📊 **Insights** | Analytics and testing |
+| 🧠 **LLM** | Provider config, API keys, failover order |
 
-**Development Tools:**
-- 🤖 **Agents** - Build and manage agents
-  - 🛠️ Marketplace - Create new agents
-  - 🤖 My Agents - Your custom agents
-  - 📚 Templates - Pre-built agent templates
-- 🔧 **Builder** - Visual tools and automation
-  - 🎨 Visual Builder - Drag-and-drop workflows
-  - 🔧 Tool Builder - Create custom tools
-  - ⚙️ Workflows - Manage workflow automation
-- 📊 **Insights** - Analytics and quality assurance
-  - 📊 Analytics - Performance metrics
-  - 🧪 Testing - Automated testing
+**UI Themes:** 🟢 Matrix · 🔵 Cyber · 🟣 Classic
 
-**UI Themes:**
-- 🟢 **Matrix** - Terminal green aesthetic (default)
-- 🔵 **Cyber** - Cyberpunk blue theme
-- 🟣 **Classic** - Purple gradient theme
+---
+
+## ⏰ Scheduled Tasks
+
+The scheduler lets you automate any agent task on a schedule — set it up by typing naturally in the Smart Assistant chat, or create jobs manually in the **⏰ Schedules** tab.
+
+### Natural language chat (Smart Assistant)
+
+```
+"Summarize my unread emails every morning at 8am"
+"Check home device status every 30 minutes"
+"Run financial summary every Sunday at 6pm"
+```
+
+The assistant detects scheduling intent, asks for confirmation, then creates the job automatically. Jobs persist across server restarts via SQLite.
+
+### Schedule types
+
+| Type | Example |
+|---|---|
+| **Cron** | Daily at a fixed time, specific days of week |
+| **Interval** | Every N hours / minutes |
+| **One-shot** | Run once at a specific datetime |
+
+### Schedules tab
+
+- View all jobs with next-run time and status
+- Pause / resume / delete individual jobs
+- Run any job immediately
+- View per-job execution history
+
+### Manual creation via API
+
+```bash
+# Interval job — every 30 minutes
+curl -X POST http://localhost:5000/api/schedules \
+  -H "Content-Type: application/json" \
+  -d '{
+    "schedule_type": "interval",
+    "name": "Email check",
+    "agent_id": "calendar",
+    "prompt": "Summarize my unread emails",
+    "minutes": 30
+  }'
+
+# Cron job — weekdays at 9am
+curl -X POST http://localhost:5000/api/schedules \
+  -H "Content-Type: application/json" \
+  -d '{
+    "schedule_type": "cron",
+    "name": "Daily briefing",
+    "agent_id": "orchestrator",
+    "prompt": "Give me a morning briefing: calendar, emails, and home status",
+    "hour": 9,
+    "minute": 0,
+    "day_of_week": "mon-fri"
+  }'
+```
+
+---
+
+## 🔗 Webhooks
+
+Each webhook is a unique secret URL. POST to it from any external service — CI/CD, monitoring, IFTTT, n8n, Zapier — and the configured agent runs immediately with the payload injected into the prompt.
+
+### Create a webhook
+
+**Via UI:** Open **🔗 Webhooks → + Create**, fill in name, agent, and prompt template.
+
+**Via API:**
+```bash
+curl -X POST http://localhost:5000/api/webhooks \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Alert Handler",
+    "agent_id": "orchestrator",
+    "prompt_template": "I received an alert. Message: {{payload.message}}. Severity: {{payload.severity}}. Summarise and suggest an action."
+  }'
+```
+
+Response includes the `token` field.
+
+### Trigger it
+
+```bash
+curl -X POST http://localhost:5000/api/trigger/<token> \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Disk usage at 94%", "severity": "high"}'
+```
+
+Query parameters also work (no body required):
+
+```bash
+curl -X POST "http://localhost:5000/api/trigger/<token>?message=Server+restarted&severity=low"
+```
+
+### Prompt template variables
+
+| Placeholder | Replaced with |
+|---|---|
+| `{{payload}}` | Full JSON payload as string |
+| `{{payload.key}}` | Value of a specific key in the payload |
+
+### Webhook management
+
+- **Enable / Disable** — disable without deleting
+- **Regenerate token** — rotates the secret; old URL stops working
+- **Execution log** — view every trigger with payload, response, duration, success/fail
+
+---
+
+## 🧠 Multi-LLM Support
+
+Configure one or more AI providers and set a failover order. If the primary provider fails, the system automatically tries the next one.
+
+### Supported providers
+
+| Provider | Models | Needs API key |
+|---|---|---|
+| **Ollama** (local) | qwen2.5:14b, llama3.2, mistral, phi3, ... | No |
+| **Anthropic** | claude-3-5-sonnet, claude-3-haiku, ... | Yes |
+| **OpenAI** | gpt-4o, gpt-4o-mini, gpt-3.5-turbo, ... | Yes |
+| **Google** | gemini-1.5-pro, gemini-1.5-flash, ... | Yes |
+
+### Setup
+
+1. Open the **🧠 LLM** tab in the UI.
+2. Enable the providers you want to use.
+3. Paste API keys (stored locally, never sent externally).
+4. Select the default provider.
+5. Configure the failover order.
+6. Click **Test** to verify connectivity.
+
+### Agent-level provider override
+
+Individual agents can be pinned to a specific provider:
+
+```python
+from base.agent_framework import Agent
+
+agent = Agent(
+    name="my_agent",
+    role="Specialist",
+    tools=[...],
+    llm_provider="anthropic"   # or "openai", "google", "ollama", None (= system default)
+)
+```
+
+### Failover order
+
+```bash
+# Set via API
+curl -X POST http://localhost:5000/api/llm/failover \
+  -H "Content-Type: application/json" \
+  -d '{"order": ["ollama", "anthropic", "openai"]}'
+```
+
+---
 
 ## 🏠 Home Assistant Agent
 
@@ -242,6 +366,8 @@ The agent uses specific entity IDs. Check `agents/home_agent.py` for your entity
 "Get status of all devices"  # Lists all entities with their IDs
 ```
 
+---
+
 ## 📅 Calendar & Email Agent
 
 **Capabilities:**
@@ -267,6 +393,8 @@ The agent uses specific entity IDs. Check `agents/home_agent.py` for your entity
 - Email IDs are strings, not integers
 - First run requires OAuth authentication in browser
 
+---
+
 ## 💰 Financial Planning Agent
 
 **Capabilities:**
@@ -285,6 +413,8 @@ The agent uses specific entity IDs. Check `agents/home_agent.py` for your entity
 "Add $100 expense for groceries"
 "How much have I saved for vacation?"
 ```
+
+---
 
 ## 🔄 Multi-Agent Workflows
 
@@ -309,6 +439,8 @@ Create workflows that coordinate multiple agents:
   ]
 }
 ```
+
+---
 
 ## 🤖 Custom Agents - Build & Publish
 
@@ -394,23 +526,35 @@ The Agent Marketplace provides a complete platform for building, testing, and pu
 
 ### Programmatic Agent Creation
 
-For advanced users, create agents via Python API:
+For advanced users, create agents via Python:
 
 ```python
-from agents.custom_agents import CustomAgentManager
+from base.agent_framework import Agent, Tool
 
-manager = CustomAgentManager()
+def my_tool(param: str) -> str:
+    return f"Result: {param}"
 
-agent_config = {
-    "name": "My Custom Agent",
-    "role": "Specialized assistant",
-    "system_instructions": "Your detailed instructions here...",
-    "tools": ["web_search", "file_operations"],
-    "user_id": "your_user_id"
-}
+new_tool = Tool(
+    name="my_tool",
+    description="Does something useful",
+    func=my_tool,
+    params={"param": "str (required)"}
+)
 
-agent = manager.create_agent(agent_config)
+agent = Agent(
+    name="my_agent",
+    role="Specialized assistant",
+    tools=[new_tool],
+    system_instructions="Your detailed instructions here...",
+    llm_provider=None   # None = system default; or "anthropic", "openai", "google", "ollama"
+)
+
+result = agent.think_and_act("Your request here")
 ```
+
+Register the agent in `base/api_server.py` to expose it via the REST API.
+
+---
 
 ## 🔧 Workflow Builder & Automation
 
@@ -567,6 +711,8 @@ Via Smart Assistant:
 "Run my morning routine workflow"
 ```
 
+---
+
 ## 📊 Insights - Analytics & Testing
 
 Monitor performance, track usage, and ensure quality with comprehensive analytics and testing tools.
@@ -707,87 +853,102 @@ Test agents without creating a suite:
 - Identify regressions
 - Track improvements
 
+---
+
+## 📚 API Reference
+
+### Agents & Chat
+
+```
+GET  /api/agents                          List all agents
+POST /api/agents/<id>/chat                Chat with an agent
+POST /api/orchestrator/execute            Smart multi-agent query
+```
+
+### Schedules
+
+```
+GET    /api/schedules                     List all jobs
+POST   /api/schedules                     Create a job
+GET    /api/schedules/<id>                Get a job
+DELETE /api/schedules/<id>                Delete a job
+POST   /api/schedules/<id>/pause          Pause a job
+POST   /api/schedules/<id>/resume         Resume a job
+POST   /api/schedules/<id>/run-now        Run a job immediately
+GET    /api/schedules/history             Execution history
+```
+
+### Webhooks
+
+```
+GET    /api/webhooks                      List webhooks
+POST   /api/webhooks                      Create webhook
+DELETE /api/webhooks/<token>              Delete webhook
+POST   /api/webhooks/<token>/toggle       Enable / disable
+POST   /api/webhooks/<token>/regenerate   Rotate secret token
+GET    /api/webhooks/log                  Execution log
+POST   /api/trigger/<token>               External trigger (the public URL)
+```
+
+### LLM
+
+```
+GET  /api/llm/providers                   List providers + config
+POST /api/llm/providers/<provider>        Set API key / model / enabled
+POST /api/llm/default                     Set default provider
+POST /api/llm/failover                    Set failover order
+POST /api/llm/test/<provider>             Test provider connectivity
+```
+
+### Home / Calendar / Finance
+
+```
+GET  /api/home/status
+GET  /api/calendar/events?days=7
+GET  /api/calendar/emails?limit=10&unread_only=true
+POST /api/workflows/execute
+```
+
+---
+
 ## 🐛 Troubleshooting
 
 ### "Cannot connect to Ollama"
+- Run `ollama serve` and ensure `http://localhost:11434` is reachable.
+- Or switch to a cloud provider in the 🧠 LLM Settings tab.
 
-- Ensure `ollama serve` is running
-- Check `http://localhost:11434` is accessible
-- Verify Qwen2.5:14b is installed: `ollama list`
+### Scheduler jobs not running
+- Check the terminal for APScheduler errors.
+- Verify `data/scheduler_jobs.sqlite` exists (created on first run).
 
-### Home Assistant not working
-
-- Check `HA_BASE_URL` in `.env`
-- Verify access token is valid
-- Test: `curl -H "Authorization: Bearer YOUR_TOKEN" http://your-ha:8123/api/states`
+### Webhook returns 404
+- Check the token — tokens are case-sensitive.
+- Verify the webhook is enabled in the UI.
 
 ### Google Calendar/Gmail errors
-
-**"insufficientPermissions" (403 error):**
-1. Delete `token.json`
-2. Update scopes in `agents/google/google_auth.py` if needed
-3. Restart backend to trigger OAuth re-authentication
-4. Grant all requested permissions
-
-**"credentials.json not found":**
-- Download OAuth credentials from Google Cloud Console
-- Save as `credentials.json` in `agent-sphere-system/`
+- **403 insufficientPermissions**: Delete `token.json` and restart to re-authenticate.
+- **credentials.json not found**: Download from Google Cloud Console and place in `agent-sphere-system/`.
 
 ### Frontend not loading data
+- Ensure backend is on port 5000.
+- Check browser console for CORS errors.
+- Test: `curl http://localhost:5000/api/health`
 
-- Check backend is running on port 5000
-- Check browser console for CORS errors
-- Verify API endpoints in browser: `http://localhost:5000/api/home/status`
+---
 
-### Agent not understanding requests
+## 🔐 Security
 
-- Increase `max_iterations` in `agent_framework.py`
-- Check system instructions in agent definition
-- Verify tool descriptions are clear
-- View agent reasoning with `verbose=True`
+**Never commit:**
+- `credentials.json` — Google OAuth client credentials
+- `token.json` — Google access/refresh tokens
+- `.env` — Home Assistant tokens
+- `data/llm_config.json` — Cloud LLM API keys
 
-## 🔐 Security Notes
+All are already in `.gitignore`.
 
-**Never commit these files:**
-- `credentials.json` - OAuth client credentials
-- `token.json` - Access tokens for your Google account
-- `.env` - Home Assistant tokens and API keys
+Webhook tokens are random 32-character hex strings. Rotate them at any time with the **Regen Token** button.
 
-These are already in `.gitignore`.
-
-**OAuth Scopes:**
-- `https://www.googleapis.com/auth/calendar` - Full calendar access
-- `https://www.googleapis.com/auth/gmail.readonly` - Read emails
-- `https://www.googleapis.com/auth/gmail.send` - Send emails
-
-## 📚 API Documentation
-
-### Chat with Agent
-
-```bash
-POST /api/agents/home/chat
-{
-  "message": "Turn on living room lights"
-}
-```
-
-### Get Home Status
-
-```bash
-GET /api/home/status
-```
-
-### Get Calendar Events
-
-```bash
-GET /api/calendar/events?days=7
-```
-
-### Get Emails
-
-```bash
-GET /api/calendar/emails?limit=10&unread_only=true
-```
+---
 
 ## 🎓 Development
 
@@ -819,13 +980,12 @@ All agents inherit from the base `Agent` class in `base/agent_framework.py`:
 
 ```python
 class Agent:
-    def __init__(self, name, role, system_instructions, tools=None):
+    def __init__(self, name, role, system_instructions, tools=None, llm_provider=None):
         self.name = name
         self.role = role
         self.system_instructions = system_instructions
         self.tools = tools or {}
-        self.ollama_base_url = "http://localhost:11434"
-        self.model = "qwen2.5:14b"
+        self.llm_provider = llm_provider  # None = use system default
 ```
 
 **Key Components:**
@@ -833,6 +993,7 @@ class Agent:
 - **role**: Brief description of agent's purpose
 - **system_instructions**: Detailed prompt defining agent behavior
 - **tools**: Dictionary of Tool objects the agent can use
+- **llm_provider**: Pin to a specific LLM (`"ollama"`, `"anthropic"`, `"openai"`, `"google"`, or `None`)
 
 #### Step 2: Create Your Agent File
 
@@ -846,7 +1007,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Define your tools
 def get_current_weather(location: str) -> str:
     """Get current weather for a location"""
     api_key = os.getenv("WEATHER_API_KEY")
@@ -872,33 +1032,6 @@ def get_current_weather(location: str) -> str:
     except Exception as e:
         return f"Error fetching weather: {str(e)}"
 
-def get_forecast(location: str, days: int = 5) -> str:
-    """Get weather forecast for a location"""
-    api_key = os.getenv("WEATHER_API_KEY")
-    url = f"https://api.openweathermap.org/data/2.5/forecast"
-
-    try:
-        response = requests.get(url, params={
-            "q": location,
-            "appid": api_key,
-            "units": "metric",
-            "cnt": days * 8  # 8 forecasts per day (3-hour intervals)
-        })
-        response.raise_for_status()
-        data = response.json()
-
-        forecast_text = f"5-Day Forecast for {location}:\n\n"
-        for item in data['list'][::8]:  # Get one per day
-            date = item['dt_txt']
-            temp = item['main']['temp']
-            desc = item['weather'][0]['description']
-            forecast_text += f"{date}: {temp}°C, {desc}\n"
-
-        return forecast_text
-    except Exception as e:
-        return f"Error fetching forecast: {str(e)}"
-
-# Create Tool objects
 weather_tool = Tool(
     name="get_current_weather",
     description="Get the current weather for a specific location. Use city name or 'city, country code'",
@@ -906,17 +1039,6 @@ weather_tool = Tool(
     params={"location": "string (required) - City name or 'city, country code'"}
 )
 
-forecast_tool = Tool(
-    name="get_forecast",
-    description="Get 5-day weather forecast for a location",
-    func=get_forecast,
-    params={
-        "location": "string (required) - City name",
-        "days": "integer (optional, default: 5) - Number of days"
-    }
-)
-
-# Define system instructions
 SYSTEM_INSTRUCTIONS = """
 You are a helpful weather assistant. You can provide current weather information
 and forecasts for any location in the world.
@@ -924,36 +1046,21 @@ and forecasts for any location in the world.
 When users ask about weather:
 1. Determine the location from their query
 2. Use get_current_weather for current conditions
-3. Use get_forecast for future weather predictions
-4. Present information in a clear, readable format
-5. Suggest appropriate clothing or activities based on weather
-
-Always be friendly and provide helpful weather-related advice.
+3. Present information in a clear, readable format
+4. Suggest appropriate clothing or activities based on weather
 """
 
-# Create the agent
 weather_agent = Agent(
     name="weather",
     role="Weather information and forecasts",
     system_instructions=SYSTEM_INSTRUCTIONS,
-    tools={
-        "get_current_weather": weather_tool,
-        "get_forecast": forecast_tool
-    }
+    tools={"get_current_weather": weather_tool},
+    llm_provider=None   # Uses system default
 )
 
-# Test function for standalone execution
 if __name__ == "__main__":
-    print("🌤️  Weather Agent Test")
-    print("-" * 50)
-
-    # Test current weather
-    response = weather_agent.chat("What's the weather in London?")
-    print(f"Response: {response}")
-
-    # Test forecast
-    response = weather_agent.chat("Give me the forecast for New York")
-    print(f"\nForecast Response: {response}")
+    response = weather_agent.think_and_act("What's the weather in London?")
+    print(response)
 ```
 
 #### Step 3: Configure Environment Variables
@@ -961,7 +1068,6 @@ if __name__ == "__main__":
 Add required API keys to `.env`:
 
 ```bash
-# Weather API (example)
 WEATHER_API_KEY=your_openweathermap_api_key_here
 ```
 
@@ -970,132 +1076,47 @@ WEATHER_API_KEY=your_openweathermap_api_key_here
 Update `agent-sphere-system/base/api_server.py` to include your new agent:
 
 ```python
-# At the top of the file, import your agent
 from agents.weather_agent import weather_agent
 
-# In the agents dictionary (around line 30), add your agent
+# In the agents dictionary, add your agent
 agents = {
     "home": home_agent,
     "calendar": calendar_agent,
     "finance": finance_agent,
-    "weather": weather_agent,  # Add your new agent
+    "weather": weather_agent,
 }
-
-# Add a status endpoint (optional, around line 150)
-@app.route('/api/weather/current/<location>', methods=['GET'])
-def get_weather_status(location):
-    """Get current weather for a location"""
-    try:
-        result = weather_agent.tools["get_current_weather"].func(location)
-        return jsonify({"success": True, "weather": result})
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
 ```
 
-#### Step 5: Add Agent to Frontend UI
+#### Step 5: Test Your Agent
 
-Update `agent-sphere-ui/src/App.jsx`:
-
-1. **Add agent to the agents array** (around line 275):
-
-```javascript
-const [agents, setAgents] = useState([
-  {
-    id: "home",
-    name: "Home Assistant",
-    role: "Smart home control",
-    status: "active",
-  },
-  {
-    id: "calendar",
-    name: "Calendar & Email",
-    role: "Schedule and communication",
-    status: "active",
-  },
-  {
-    id: "finance",
-    name: "Finance Manager",
-    role: "Budget and expenses",
-    status: "active",
-  },
-  {
-    id: "weather",
-    name: "Weather Assistant",
-    role: "Weather info and forecasts",
-    status: "active",
-  },
-]);
-```
-
-2. **Add a dedicated tab for your agent** (optional):
-
-```javascript
-{activeTab === "weather" && (
-  <section className="section">
-    <h2>🌤️ Weather Information</h2>
-
-    {/* Add custom UI components here */}
-    <div className="weather-dashboard">
-      {/* Display current weather */}
-      {/* Show forecasts */}
-      {/* Quick location search */}
-    </div>
-
-    {/* Chat interface */}
-    <div className="chat-container">
-      {/* Reuse existing chat components */}
-    </div>
-  </section>
-)}
-```
-
-#### Step 6: Test Your Agent
-
-**Standalone Testing:**
 ```bash
-cd agent-sphere-system
+# Standalone
 python agents/weather_agent.py
-```
 
-**Via API:**
-```bash
-# Start the backend
-python -m base.api_server
-
-# Test the chat endpoint
+# Via API (after starting the backend)
 curl -X POST http://localhost:5000/api/agents/weather/chat \
   -H "Content-Type: application/json" \
   -d '{"message": "What is the weather in Paris?"}'
-
-# Test custom endpoint (if you added one)
-curl http://localhost:5000/api/weather/current/London
 ```
-
-**Via UI:**
-1. Start the frontend: `cd agent-sphere-ui && npm start`
-2. Navigate to the Chat tab
-3. Select "Weather Assistant" from the agent list
-4. Ask: "What's the weather in Tokyo?"
 
 #### Best Practices for Custom Agents
 
-**1. Tool Design:**
+**Tool Design:**
 - Keep tools focused on single responsibilities
 - Provide clear, descriptive tool names
 - Include comprehensive parameter descriptions
 - Handle errors gracefully and return user-friendly messages
 
-**2. System Instructions:**
+**System Instructions:**
 - Be specific about agent capabilities
 - Define clear boundaries of what the agent can/cannot do
 - Include response formatting guidelines
 - Add examples of desired behavior
 
-**3. Error Handling:**
+**Error Handling:**
 ```python
 def robust_api_call(param):
     try:
-        # Your API call
         response = api.call(param)
         return format_success(response)
     except requests.exceptions.Timeout:
@@ -1107,105 +1128,11 @@ def robust_api_call(param):
         return "An unexpected error occurred."
 ```
 
-**4. Environment Configuration:**
+**Environment Configuration:**
 - Use environment variables for API keys
 - Provide clear setup instructions
 - Include validation for required configuration
 - Use sensible defaults where possible
-
-**5. Testing:**
-- Write unit tests for each tool
-- Test edge cases and error scenarios
-- Validate API responses
-- Test agent reasoning with various queries
-
-#### Example: Complete Agent Structure
-
-```
-agent-sphere-system/
-├── agents/
-│   ├── weather_agent.py         # Your new agent
-│   └── weather/                 # Optional: organize complex agents
-│       ├── __init__.py
-│       ├── weather_api.py       # API wrapper
-│       ├── tools.py             # Tool definitions
-│       └── prompts.py           # System instructions
-├── base/
-│   └── api_server.py            # Update to include agent
-└── .env                         # Add configuration
-```
-
-#### Advanced: Multi-API Agents
-
-For agents that integrate multiple APIs (like the Google Calendar/Gmail agent):
-
-```python
-class WeatherManager:
-    """Manages multiple weather data sources"""
-
-    def __init__(self):
-        self.openweather_api = OpenWeatherAPI()
-        self.weatherapi_com = WeatherAPIcom()
-        self.cache = {}
-
-    def get_current_weather(self, location):
-        # Try primary API
-        try:
-            return self.openweather_api.current(location)
-        except:
-            # Fallback to secondary API
-            return self.weatherapi_com.current(location)
-
-    def get_cached_weather(self, location):
-        # Implement caching to reduce API calls
-        if location in self.cache:
-            return self.cache[location]
-        result = self.get_current_weather(location)
-        self.cache[location] = result
-        return result
-
-# Use the manager in your tools
-manager = WeatherManager()
-
-weather_tool = Tool(
-    name="get_weather",
-    description="Get current weather with automatic fallback",
-    func=manager.get_current_weather,
-    params={"location": "string (required)"}
-)
-```
-
-#### Debugging Tips
-
-**Enable verbose logging:**
-```python
-import logging
-logging.basicConfig(level=logging.DEBUG)
-
-# In your agent
-response = agent.chat("test query", verbose=True)
-```
-
-**Check tool execution:**
-```python
-# Test tool directly
-result = agent.tools["get_current_weather"].func("London")
-print(result)
-```
-
-**Monitor API calls:**
-```python
-import requests
-from requests.adapters import HTTPAdapter
-from requests.packages.urllib3.util.retry import Retry
-
-# Add retry logic
-session = requests.Session()
-retry = Retry(total=3, backoff_factor=1)
-adapter = HTTPAdapter(max_retries=retry)
-session.mount('http://', adapter)
-session.mount('https://', adapter)
-```
 
 ### Modifying UI
 
@@ -1213,6 +1140,9 @@ React components are in `agent-sphere-ui/src/components/`
 
 **Key Components:**
 - `HomeAutomation.jsx` - Home automation UI
+- `ScheduleManager.jsx` - Scheduled jobs UI
+- `WebhookManager.jsx` - Webhook management UI
+- `LLMSettings.jsx` - Multi-LLM configuration UI
 - `AnalyticsDashboard.jsx` - Analytics dashboard
 - `TestRunner.jsx` - Testing interface
 - `TemplateBrowser.jsx` - Agent templates
@@ -1227,45 +1157,13 @@ React components are in `agent-sphere-ui/src/components/`
 python agents/home_agent.py
 python agents/google/google_unified_agent.py
 python agents/finance_agent.py
-python agents/weather_agent.py  # Your custom agent
-
-# Run test suite (if you've created tests)
-python -m pytest tests/
 
 # Test specific agent functionality
-python -c "from agents.weather_agent import weather_agent; \
-           print(weather_agent.chat('What is the weather in London?'))"
+python -c "from agents.home_agent import home_agent; \
+           print(home_agent.think_and_act('What lights are on?'))"
 ```
 
-## 📝 License
-
-Open source - feel free to modify and extend!
-
-## 🚀 Next Steps
-
-**Getting Started:**
-1. Configure your Home Assistant integration
-2. Set up Google Calendar/Gmail OAuth
-3. Explore the UI themes (Matrix/Cyber/Classic)
-4. Try the Smart Multi-Agent Assistant
-
-**Build & Customize:**
-5. Create custom agents in the Marketplace
-6. Use agent templates as starting points
-7. Build custom tools for your agents
-8. Design visual workflows for automation
-
-**Monitor & Optimize:**
-9. Track agent performance in Analytics
-10. Set up automated testing for quality assurance
-11. Monitor usage patterns and optimize
-12. Export reports and share insights
-
-**Advanced:**
-13. Extend with additional API integrations
-14. Create complex conditional workflows
-15. Build domain-specific agent suites
-16. Contribute templates to the marketplace
+---
 
 ## 🎨 UI Features
 
@@ -1287,4 +1185,41 @@ Open source - feel free to modify and extend!
 - Touch-friendly controls
 - Adaptive layouts
 
-Enjoy building! 🎉
+---
+
+## 🚀 Next Steps
+
+**Getting Started:**
+1. Configure your Home Assistant integration
+2. Set up Google Calendar/Gmail OAuth
+3. Explore the UI themes (Matrix/Cyber/Classic)
+4. Try the Smart Multi-Agent Assistant
+
+**Build & Customize:**
+5. Create custom agents in the Marketplace
+6. Use agent templates as starting points
+7. Build custom tools for your agents
+8. Design visual workflows for automation
+
+**Automate:**
+9. Set up scheduled tasks via natural language chat
+10. Create webhooks to trigger agents from external services
+11. Configure multi-LLM failover for reliability
+
+**Monitor & Optimize:**
+12. Track agent performance in Analytics
+13. Set up automated testing for quality assurance
+14. Monitor usage patterns and optimize
+15. Export reports and share insights
+
+**Advanced:**
+16. Extend with additional API integrations
+17. Create complex conditional workflows
+18. Build domain-specific agent suites
+19. Contribute templates to the marketplace
+
+---
+
+## 📝 License
+
+Open source — modify and extend freely.

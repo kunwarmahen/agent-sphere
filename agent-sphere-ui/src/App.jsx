@@ -9,6 +9,7 @@ import TemplateBrowser from "./components/TemplateBrowser";
 import HomeAutomation from "./components/HomeAutomation";
 import ScheduleManager from "./components/ScheduleManager";
 import LLMSettings from "./components/LLMSettings";
+import WebhookManager from "./components/WebhookManager";
 
 import "./App.css";
 
@@ -1526,12 +1527,26 @@ export default function App() {
         >
           🧠 LLM
         </button>
+
+        <button
+          className={`nav-btn ${activeTab === "webhooks" ? "active" : ""}`}
+          onClick={() => setActiveTab("webhooks")}
+        >
+          🔗 Webhooks
+        </button>
       </nav>
       <main className="content">
         {/* LLM SETTINGS TAB */}
         {activeTab === "llm" && (
           <section className="section" style={{ padding: 0 }}>
             <LLMSettings theme={theme} showNotification={showNotification} />
+          </section>
+        )}
+
+        {/* WEBHOOKS TAB */}
+        {activeTab === "webhooks" && (
+          <section className="section" style={{ padding: 0 }}>
+            <WebhookManager theme={theme} showNotification={showNotification} />
           </section>
         )}
 
