@@ -87,9 +87,15 @@ class MemoryManager:
 
         memories = self._load(agent_id)
 
-        # Avoid exact duplicates
+        # Avoid exact and near-duplicate entries (substring overlap > 80%)
+        content_lower = content.lower()
         for m in memories:
-            if m["content"].lower() == content.lower():
+            existing = m["content"].lower()
+            if existing == content_lower:
+                return {"success": False, "error": "Duplicate memory", "memory": m}
+            # Reject if one is largely contained in the other (fuzzy dedup)
+            shorter, longer = sorted([content_lower, existing], key=len)
+            if shorter and shorter in longer:
                 return {"success": False, "error": "Duplicate memory", "memory": m}
 
         entry = {
