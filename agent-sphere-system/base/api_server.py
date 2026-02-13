@@ -3,7 +3,7 @@ Flask API Server - RESTful API for the multi-agent system with WebSocket support
 """
 
 import os
-
+import uuid
 import tempfile
 import whisper
 from flask import Flask, request, jsonify
@@ -35,6 +35,11 @@ from store.storage_backends import get_storage_backend
 from analytics.analytics import agent_analytics, ExecutionTimer
 from testing.testing import agent_tester, TestCase
 from templates.templates import agent_template_library
+from scheduler.scheduler_engine import scheduler_engine
+from scheduler.schedule_intent import (
+    detect_schedule_intent, build_confirmation_message, intent_to_job_spec,
+    store_pending, pop_pending, has_pending, is_confirmation, is_cancellation
+)
 
 
 # Initialize Flask app
@@ -106,6 +111,10 @@ def handle_subscribe(data):
 def broadcast_update(event_type, data):
     """Broadcast real-time updates to all connected clients"""
     socketio.emit('system_update', {'type': event_type, 'data': data, 'timestamp': datetime.now().isoformat()})
+
+# Start the scheduler now that broadcast_update is defined
+scheduler_engine.set_broadcast(broadcast_update)
+scheduler_engine.start()
 
 # ============================================================================
 # HEALTH & STATUS ENDPOINTS
@@ -828,28 +837,62 @@ def execute_orchestrated_query():
     try:
         data = request.json
         query = data.get('query', '').strip()
-        
+        session_key = data.get('session_key', 'default')
+
         if not query:
             return jsonify({"error": "Query is required"}), 400
-        
+
+        # ── Schedule confirmation flow ──────────────────────────────────────
+        if has_pending(session_key):
+            if is_confirmation(query):
+                job_spec = pop_pending(session_key)
+                result = _create_job_from_spec(job_spec)
+                reply = (
+                    f"Schedule created! **{job_spec['name']}** will run {job_spec['schedule_desc']}.\n"
+                    f"Job ID: `{job_spec['job_id']}`"
+                    if result.get("success") else
+                    f"Sorry, I couldn't create the schedule: {result.get('error')}"
+                )
+                _store_conversation(session_key, query, reply)
+                return jsonify({
+                    "query": query, "schedule_created": result.get("success"),
+                    "execution": {"final_response": reply},
+                    "timestamp": datetime.now().isoformat()
+                }), 200
+            elif is_cancellation(query):
+                pop_pending(session_key)
+                reply = "Okay, I've cancelled the schedule."
+                _store_conversation(session_key, query, reply)
+                return jsonify({
+                    "query": query, "schedule_created": False,
+                    "execution": {"final_response": reply},
+                    "timestamp": datetime.now().isoformat()
+                }), 200
+
+        # ── Detect new scheduling intent ────────────────────────────────────
+        intent = detect_schedule_intent(query)
+        if intent:
+            job_spec = intent_to_job_spec(intent)
+            store_pending(session_key, job_spec)
+            reply = build_confirmation_message(intent)
+            _store_conversation(session_key, query, reply)
+            broadcast_update('schedule_confirmation_pending', {
+                'session_key': session_key, 'job_spec': job_spec
+            })
+            return jsonify({
+                "query": query, "schedule_pending": True,
+                "execution": {"final_response": reply},
+                "timestamp": datetime.now().isoformat()
+            }), 200
+
         # Step 1: Analyze the request
         analysis = orchestrator.analyze_request(query)
-        
+
         # Step 2: Execute the plan sequentially
         execution_result = orchestrator.execute_sequential_plan(analysis)
         
         # Store in conversation history
-        conversations["orchestrator"] = conversations.get("orchestrator", [])
-        conversations["orchestrator"].append({
-            "type": "user",
-            "message": query,
-            "timestamp": datetime.now().isoformat()
-        })
-        conversations["orchestrator"].append({
-            "type": "assistant",
-            "message": execution_result["final_response"],
-            "timestamp": datetime.now().isoformat()
-        })
+        _store_conversation(session_key, query, execution_result["final_response"])
         
         # Broadcast update
         broadcast_update('orchestrator_execution', {
@@ -1802,6 +1845,162 @@ def search_templates():
         return jsonify({"error": str(e)}), 500
 
 # ============================================================================
+# SCHEDULE HELPERS
+# ============================================================================
+
+def _store_conversation(session_key: str, user_msg: str, assistant_msg: str):
+    conversations["orchestrator"] = conversations.get("orchestrator", [])
+    conversations["orchestrator"].append({"type": "user", "message": user_msg, "timestamp": datetime.now().isoformat()})
+    conversations["orchestrator"].append({"type": "assistant", "message": assistant_msg, "timestamp": datetime.now().isoformat()})
+
+
+def _create_job_from_spec(spec: dict) -> dict:
+    """Create an APScheduler job from a spec dict produced by intent_to_job_spec"""
+    from datetime import datetime as dt
+    stype = spec.get("schedule_type", "cron")
+    common = dict(
+        job_id=spec["job_id"],
+        name=spec["name"],
+        agent_id=spec["agent_id"],
+        prompt=spec["prompt"],
+        schedule_desc=spec["schedule_desc"],
+    )
+    if stype == "cron":
+        c = spec.get("cron", {})
+        return scheduler_engine.add_cron_job(
+            **common,
+            hour=c.get("hour"), minute=c.get("minute", 0),
+            day_of_week=c.get("day_of_week", "*"),
+            day=c.get("day", "*"), month=c.get("month", "*"),
+        )
+    elif stype == "interval":
+        iv = spec.get("interval", {})
+        return scheduler_engine.add_interval_job(
+            **common, hours=iv.get("hours", 0), minutes=iv.get("minutes", 0),
+        )
+    elif stype == "one_shot":
+        run_at = dt.fromisoformat(spec["run_at"])
+        return scheduler_engine.add_one_shot_job(**common, run_at=run_at)
+    return {"success": False, "error": f"Unknown schedule_type: {stype}"}
+
+
+# ============================================================================
+# SCHEDULE ENDPOINTS
+# ============================================================================
+
+@app.route('/api/schedules', methods=['GET'])
+def list_schedules():
+    """List all scheduled jobs"""
+    try:
+        jobs = scheduler_engine.list_jobs()
+        return jsonify({"jobs": jobs, "total": len(jobs)}), 200
+    except Exception as e:
+        logger.error(f"Error listing schedules: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/schedules', methods=['POST'])
+def create_schedule():
+    """Manually create a scheduled job"""
+    try:
+        data = request.json
+        schedule_type = data.get('schedule_type', 'cron')
+        common = dict(
+            job_id=data.get('job_id', f"job_{uuid.uuid4().hex[:8]}"),
+            name=data.get('name', 'Untitled Job'),
+            agent_id=data.get('agent_id', 'orchestrator'),
+            prompt=data.get('prompt', ''),
+            schedule_desc=data.get('schedule_desc', ''),
+        )
+
+        if schedule_type == 'cron':
+            result = scheduler_engine.add_cron_job(
+                **common,
+                hour=data.get('hour'), minute=data.get('minute', 0),
+                day_of_week=data.get('day_of_week', '*'),
+                day=data.get('day', '*'), month=data.get('month', '*'),
+            )
+        elif schedule_type == 'interval':
+            result = scheduler_engine.add_interval_job(
+                **common, hours=data.get('hours', 0), minutes=data.get('minutes', 0),
+            )
+        elif schedule_type == 'one_shot':
+            from datetime import datetime as dt
+            result = scheduler_engine.add_one_shot_job(
+                **common, run_at=dt.fromisoformat(data.get('run_at')),
+            )
+        else:
+            return jsonify({"error": f"Unknown schedule_type: {schedule_type}"}), 400
+
+        if result.get("success"):
+            broadcast_update('schedule_created', result)
+        return jsonify(result), 201 if result.get("success") else 400
+    except Exception as e:
+        logger.error(f"Error creating schedule: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/schedules/<job_id>', methods=['GET'])
+def get_schedule(job_id):
+    try:
+        job = scheduler_engine.get_job(job_id)
+        if not job:
+            return jsonify({"error": "Job not found"}), 404
+        return jsonify(job), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/schedules/<job_id>', methods=['DELETE'])
+def delete_schedule(job_id):
+    try:
+        result = scheduler_engine.delete_job(job_id)
+        if result.get("success"):
+            broadcast_update('schedule_deleted', {"job_id": job_id})
+        return jsonify(result), 200 if result.get("success") else 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/schedules/<job_id>/pause', methods=['POST'])
+def pause_schedule(job_id):
+    try:
+        result = scheduler_engine.pause_job(job_id)
+        return jsonify(result), 200 if result.get("success") else 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/schedules/<job_id>/resume', methods=['POST'])
+def resume_schedule(job_id):
+    try:
+        result = scheduler_engine.resume_job(job_id)
+        return jsonify(result), 200 if result.get("success") else 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/schedules/<job_id>/run-now', methods=['POST'])
+def run_schedule_now(job_id):
+    try:
+        result = scheduler_engine.run_now(job_id)
+        return jsonify(result), 200 if result.get("success") else 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/schedules/history', methods=['GET'])
+def schedule_history():
+    try:
+        job_id = request.args.get('job_id')
+        limit = request.args.get('limit', 50, type=int)
+        history = scheduler_engine.get_execution_history(job_id, limit)
+        return jsonify({"history": history, "total": len(history)}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ============================================================================
 # ERROR HANDLERS
 # ============================================================================
 
@@ -1818,20 +2017,25 @@ def server_error(error):
 # ============================================================================
 
 if __name__ == '__main__':
+    import atexit
+    atexit.register(scheduler_engine.shutdown)
+
     print("\n" + "=" * 70)
     print("  MULTI-AGENT AI SYSTEM - FLASK API SERVER WITH WEBSOCKET")
     print("=" * 70)
     print("\n✅ Server starting on http://localhost:5000")
     print("✅ WebSocket available for real-time updates")
+    print("✅ Scheduler running (cron jobs active)")
     print("\n📚 API Documentation:")
     print("   Health: GET /api/health")
     print("   Status: GET /api/status")
     print("   Agents: GET /api/agents")
     print("   Chat: POST /api/agents/<id>/chat")
     print("   Workflows: GET/POST /api/workflows")
+    print("   Schedules: GET/POST /api/schedules")
     print("   Templates: GET /api/templates")
     print("   Notifications: GET /api/notifications")
     print("\n🔗 Connect your React app to http://localhost:5000")
     print("=" * 70 + "\n")
-    
+
     socketio.run(app, debug=True, host='0.0.0.0', port=5000)

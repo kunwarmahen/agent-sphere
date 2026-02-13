@@ -7,6 +7,7 @@ import AnalyticsDashboard from "./components/AnalyticsDashboard";
 import TestRunner from "./components/TestRunner";
 import TemplateBrowser from "./components/TemplateBrowser";
 import HomeAutomation from "./components/HomeAutomation";
+import ScheduleManager from "./components/ScheduleManager";
 
 import "./App.css";
 
@@ -515,6 +516,16 @@ export default function App() {
         `Workflow ${data.data.workflow_id} completed`,
         "success"
       );
+    } else if (data.type === "schedule_created") {
+      showNotification(`Schedule created: ${data.data.name}`, "success");
+    } else if (data.type === "schedule_deleted") {
+      showNotification(`Schedule removed`, "info");
+    } else if (data.type === "schedule_job_result") {
+      const d = data.data;
+      showNotification(
+        `${d.job_name}: ${d.success ? "completed" : "failed"}`,
+        d.success ? "success" : "error"
+      );
     }
   };
 
@@ -683,6 +694,7 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           query: query + customAgentsContext,
+          session_key: "ui_main",
         }),
       });
 
@@ -1469,6 +1481,13 @@ export default function App() {
           💰 Finance
         </button>
 
+        <button
+          className={`nav-btn ${activeTab === "schedules" ? "active" : ""}`}
+          onClick={() => setActiveTab("schedules")}
+        >
+          ⏰ Schedules
+        </button>
+
         {/* Development Section */}
         <button
           className={`nav-btn ${["agentMarketplace", "customAgents", "templates"].includes(activeTab) ? "active" : ""}`}
@@ -1501,6 +1520,13 @@ export default function App() {
         </button>
       </nav>
       <main className="content">
+        {/* SCHEDULES TAB */}
+        {activeTab === "schedules" && (
+          <section className="section" style={{ padding: 0 }}>
+            <ScheduleManager theme={theme} showNotification={showNotification} />
+          </section>
+        )}
+
         {/* AGENTS TAB - Grouped */}
         {["agentMarketplace", "customAgents", "templates"].includes(activeTab) && (
           <section className="section">
@@ -2460,7 +2486,7 @@ export default function App() {
                     ) : (
                       <div>
                         <div>{formatAgentResponse(msg.text)}</div>
-                        {msg.execution && (
+                        {msg.execution && msg.execution.steps_executed && (
                           <div
                             style={{
                               marginTop: "1rem",
@@ -2477,9 +2503,9 @@ export default function App() {
                             </p>
                             <p style={{ margin: "0.5rem 0" }}>
                               🤖 Agents Used:{" "}
-                              {msg.analysis.detected_agents.join(", ")}
+                              {msg.analysis?.detected_agents?.join(", ")}
                             </p>
-                            {msg.execution.errors.length > 0 && (
+                            {msg.execution.errors?.length > 0 && (
                               <p
                                 style={{ margin: "0.5rem 0", color: "#ffb3b3" }}
                               >
