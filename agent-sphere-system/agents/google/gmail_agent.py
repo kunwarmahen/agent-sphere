@@ -139,13 +139,14 @@ try:
     gmail_manager = GmailManager()
 except Exception as e:
     logger.error(f"Failed to initialize GmailManager: {e}")
+    _gmail_init_error = str(e)  # capture before 'e' is deleted by Python 3 scoping rules
     class DummyManager:
         def __init__(self): pass
-        def get_unread_emails(self, limit: int = 5): return f"ERROR: Gmail API setup failed. {e}"
-        def read_email(self, email_id: str): return f"ERROR: Gmail API setup failed. {e}"
+        def get_unread_emails(self, limit: int = 5): return f"ERROR: Gmail API setup failed. {_gmail_init_error}"
+        def read_email(self, email_id: str): return f"ERROR: Gmail API setup failed. {_gmail_init_error}"
         def send_email(self, *args): return "Tool Disabled: Authentication Error."
-        def get_activity_log(self, *args): return f"ERROR: Gmail API setup failed. {e}"
-    
+        def get_activity_log(self, *args): return f"ERROR: Gmail API setup failed. {_gmail_init_error}"
+
     gmail_manager = DummyManager()
 
 

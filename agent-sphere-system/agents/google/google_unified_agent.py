@@ -22,11 +22,11 @@ class UnifiedGoogleManager:
         if unread_only:
             emails = self.gmail.get_unread_emails(limit)
         else:
-            # Get all recent emails (not just unread)
             emails = self.gmail.get_activity_log(limit)
 
         if isinstance(emails, str):
-            return emails
+            # Error string from DummyManager or API failure — wrap as JSON
+            return json.dumps({"count": 0, "emails": [], "error": emails})
 
         return json.dumps({
             "count": len(emails),

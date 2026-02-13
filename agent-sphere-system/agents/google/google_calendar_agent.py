@@ -111,13 +111,14 @@ try:
     calendar_manager = GoogleCalendarManager()
 except Exception as e:
     logger.error(f"Failed to initialize GoogleCalendarManager: {e}")
+    _cal_init_error = str(e)  # capture before 'e' is deleted by Python 3 scoping rules
     class DummyManager:
         def __init__(self): pass
-        def get_events(self, days: int = 3): return f"ERROR: Calendar API setup failed. {e}"
-        def schedule_event(self, *args): return f"ERROR: Calendar API setup failed. {e}"
-        def get_busy_times(self): return f"ERROR: Calendar API setup failed. {e}"
+        def get_events(self, days: int = 3): return f"ERROR: Calendar API setup failed. {_cal_init_error}"
+        def schedule_event(self, *args): return f"ERROR: Calendar API setup failed. {_cal_init_error}"
+        def get_busy_times(self): return f"ERROR: Calendar API setup failed. {_cal_init_error}"
         def find_free_slot(self, *args): return "Tool Disabled: Authentication Error."
-    
+
     calendar_manager = DummyManager()
 
 
