@@ -27,17 +27,12 @@ class LLMSequentialOrchestrator:
         self.max_steps = 5
     
     def _call_ollama(self, messages: List[Dict]) -> str:
-        """Call local Ollama Qwen model"""
+        """Call LLM via router (Ollama/Claude/GPT-4o/Gemini with failover)"""
         try:
-            response = requests.post(
-                f"{OLLAMA_BASE_URL}/api/chat",
-                json={"model": OLLAMA_MODEL, "messages": messages, "stream": False},
-                timeout=120
-            )
-            response.raise_for_status()
-            return response.json()["message"]["content"]
+            from llm.llm_router import llm_router
+            return llm_router.chat(messages)
         except Exception as e:
-            return f"Error calling Ollama: {str(e)}"
+            return f"Error calling LLM: {str(e)}"
     
     def analyze_request(self, user_request: str) -> Dict:
         """Analyze request to determine which agents are needed"""

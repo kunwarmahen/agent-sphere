@@ -8,6 +8,7 @@ import TestRunner from "./components/TestRunner";
 import TemplateBrowser from "./components/TemplateBrowser";
 import HomeAutomation from "./components/HomeAutomation";
 import ScheduleManager from "./components/ScheduleManager";
+import LLMSettings from "./components/LLMSettings";
 
 import "./App.css";
 
@@ -1518,8 +1519,22 @@ export default function App() {
         >
           📊 Insights
         </button>
+
+        <button
+          className={`nav-btn ${activeTab === "llm" ? "active" : ""}`}
+          onClick={() => setActiveTab("llm")}
+        >
+          🧠 LLM
+        </button>
       </nav>
       <main className="content">
+        {/* LLM SETTINGS TAB */}
+        {activeTab === "llm" && (
+          <section className="section" style={{ padding: 0 }}>
+            <LLMSettings theme={theme} showNotification={showNotification} />
+          </section>
+        )}
+
         {/* SCHEDULES TAB */}
         {activeTab === "schedules" && (
           <section className="section" style={{ padding: 0 }}>

@@ -6,7 +6,7 @@ import re
 from typing import Any, Callable, Dict, List, Optional
 import requests
 
-# Configure Ollama connection
+# Configure Ollama connection (legacy defaults — now routed via LLMRouter)
 OLLAMA_BASE_URL = "http://localhost:11434"
 OLLAMA_MODEL = "qwen2.5:14b"
 
@@ -30,13 +30,15 @@ class Tool:
 
 class Agent:
     """Core AI Agent that reasons and uses tools"""
-    def __init__(self, name: str, role: str, tools: List[Tool], system_instructions: str = ""):
+    def __init__(self, name: str, role: str, tools: List[Tool], system_instructions: str = "",
+                 llm_provider: Optional[str] = None):
         self.name = name
         self.role = role
         self.tools = {tool.name: tool for tool in tools}
         self.memory = []
         self.max_iterations = 10
         self.system_instructions = system_instructions
+        self.llm_provider = llm_provider  # None = use system default
     
     def _format_tools(self) -> str:
         """Format available tools for the prompt"""
@@ -115,20 +117,17 @@ class Agent:
 
         return None
     
-    def _call_ollama(self, messages: List[Dict]) -> str:
-        """Call local Ollama Qwen model"""
+    def _call_llm(self, messages: List[Dict]) -> str:
+        """Call LLM via the router (supports Ollama, Claude, GPT-4o, Gemini with failover)"""
         try:
-            response = requests.post(
-                f"{OLLAMA_BASE_URL}/api/chat",
-                json={"model": OLLAMA_MODEL, "messages": messages, "stream": False},
-                timeout=120
-            )
-            response.raise_for_status()
-            return response.json()["message"]["content"]
-        except requests.exceptions.ConnectionError:
-            return "Error: Cannot connect to Ollama. Make sure it's running on http://localhost:11434"
+            from llm.llm_router import llm_router
+            return llm_router.chat(messages, provider=self.llm_provider)
         except Exception as e:
-            return f"Error calling Ollama: {str(e)}"
+            return f"Error calling LLM: {str(e)}"
+
+    # Keep legacy name as alias for backward compatibility
+    def _call_ollama(self, messages: List[Dict]) -> str:
+        return self._call_llm(messages)
     
     def think_and_act(self, user_request: str, verbose: bool = False) -> str:
         """Main agent loop: think, decide, act"""
@@ -165,7 +164,7 @@ After using a tool, wait for the result before deciding the next action."""
             messages = [{"role": "system", "content": base_prompt}] + self.memory
             
             # Get model response
-            response = self._call_ollama(messages)
+            response = self._call_llm(messages)
             
             if verbose:
                 print(f"Agent: {response[:200]}...")

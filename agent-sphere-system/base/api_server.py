@@ -40,6 +40,8 @@ from scheduler.schedule_intent import (
     detect_schedule_intent, build_confirmation_message, intent_to_job_spec,
     store_pending, pop_pending, has_pending, is_confirmation, is_cancellation
 )
+from llm.llm_config import llm_config, PROVIDERS
+from llm.llm_router import llm_router
 
 
 # Initialize Flask app
@@ -1843,6 +1845,68 @@ def search_templates():
     except Exception as e:
         logger.error(f"Error searching templates: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+# ============================================================================
+# LLM CONFIGURATION ENDPOINTS
+# ============================================================================
+
+@app.route('/api/llm/providers', methods=['GET'])
+def get_llm_providers():
+    """List all providers with their metadata and current config (keys masked)"""
+    return jsonify(llm_config.to_dict(mask_keys=True)), 200
+
+
+@app.route('/api/llm/providers/<provider>', methods=['POST'])
+def configure_llm_provider(provider):
+    """Set API key, model, and enabled state for a provider"""
+    try:
+        data = request.json
+        result = llm_config.set_provider(
+            provider,
+            api_key=data.get('api_key'),
+            model=data.get('model'),
+            enabled=data.get('enabled'),
+            base_url=data.get('base_url'),
+        )
+        return jsonify(result), 200 if result['success'] else 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/llm/default', methods=['POST'])
+def set_llm_default():
+    """Set the default provider and optionally the default model"""
+    try:
+        data = request.json
+        result = llm_config.set_default_provider(
+            data.get('provider', 'ollama'),
+            model=data.get('model')
+        )
+        return jsonify(result), 200 if result['success'] else 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/llm/failover', methods=['POST'])
+def set_llm_failover():
+    """Set the failover provider order"""
+    try:
+        data = request.json
+        result = llm_config.set_failover_order(data.get('order', ['ollama']))
+        return jsonify(result), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/llm/test/<provider>', methods=['POST'])
+def test_llm_provider(provider):
+    """Test connectivity to a specific provider"""
+    try:
+        result = llm_router.test_provider(provider)
+        return jsonify(result), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 # ============================================================================
 # SCHEDULE HELPERS
