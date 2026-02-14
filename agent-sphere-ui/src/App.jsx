@@ -11,6 +11,8 @@ import ScheduleManager from "./components/ScheduleManager";
 import LLMSettings from "./components/LLMSettings";
 import WebhookManager from "./components/WebhookManager";
 import MemoryManager from "./components/MemoryManager";
+import TelegramSettings from "./components/TelegramSettings";
+import NotificationCenter from "./components/NotificationCenter";
 
 import "./App.css";
 
@@ -295,6 +297,7 @@ export default function App() {
   const [homeStatus, setHomeStatus] = useState(null);
   const [financialData, setFinancialData] = useState(null);
   const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [theme, setTheme] = useState('matrix'); // 'matrix', 'cyber', 'classic'
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [visualBuilderWorkflow, setVisualBuilderWorkflow] = useState(null);
@@ -347,6 +350,10 @@ export default function App() {
     socketRef.current.on("notification", (notification) => {
       setNotifications((prev) => [...prev, notification]);
       showBrowserNotification(notification);
+      // Increment unread badge
+      if (!notification.read) {
+        setUnreadCount((prev) => prev + 1);
+      }
     });
 
     // ============================================================================
@@ -456,6 +463,11 @@ export default function App() {
 
     if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission();
+    }
+
+    // Register service worker for background push notifications
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {/* silent */});
     }
 
     return () => {
@@ -899,6 +911,7 @@ export default function App() {
       const response = await fetch(`${API_URL}/notifications`);
       const data = await response.json();
       setNotifications(data.notifications || []);
+      setUnreadCount(data.unread_count ?? 0);
     } catch (error) {
       console.error("Error fetching notifications:", error);
     }
@@ -1542,6 +1555,22 @@ export default function App() {
         >
           🧩 Memory
         </button>
+
+        <button
+          className={`nav-btn ${activeTab === "telegram" ? "active" : ""}`}
+          onClick={() => setActiveTab("telegram")}
+        >
+          ✈️ Telegram
+        </button>
+
+        {/* Notification bell — right-aligned in nav */}
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", padding: "0 8px" }}>
+          <NotificationCenter
+            theme={theme}
+            showNotification={showNotification}
+            onUnreadChange={setUnreadCount}
+          />
+        </div>
       </nav>
       <main className="content">
         {/* LLM SETTINGS TAB */}
@@ -1562,6 +1591,13 @@ export default function App() {
         {activeTab === "memory" && (
           <section className="section" style={{ padding: 0 }}>
             <MemoryManager theme={theme} showNotification={showNotification} />
+          </section>
+        )}
+
+        {/* TELEGRAM TAB */}
+        {activeTab === "telegram" && (
+          <section className="section" style={{ padding: 0 }}>
+            <TelegramSettings theme={theme} showNotification={showNotification} />
           </section>
         )}
 

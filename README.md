@@ -1,6 +1,6 @@
 # Agent Sphere
 
-A complete, self-hosted AI agent platform with a web UI for home automation, calendar/email management, financial planning, scheduled automation, webhook triggers, and multi-LLM support.
+A complete, self-hosted AI agent platform with a web UI for home automation, calendar/email management, financial planning, scheduled automation, webhook triggers, multi-LLM support, persistent memory, Telegram integration, and real-time notifications.
 
 ## 🎯 Overview
 
@@ -15,6 +15,8 @@ A complete, self-hosted AI agent platform with a web UI for home automation, cal
 - **Webhooks** — Unique HTTP trigger URLs per agent; external services POST to fire any agent
 - **Multi-LLM Support** — Ollama (local), Anthropic Claude, OpenAI GPT, Google Gemini with automatic failover
 - **Persistent Long-Term Memory** — Agents remember facts and context across sessions; `/remember` command, auto-extraction, per-agent memory store
+- **Telegram Integration** — Full bot interface; chat with any agent from your phone, receive scheduled job results as push messages
+- **Notifications & Alerting** — Persistent in-app notification center with unread badge, alert keyword matching, budget thresholds, browser push (works when tab is closed)
 - **Analytics Dashboard** — Track performance, response times, and usage metrics
 - **Testing Framework** — Automated test suites and quick ad-hoc testing
 - **Real API Integrations** — Home Assistant, Google Calendar, Gmail
@@ -50,12 +52,20 @@ agent-sphere/
 │   │   └── webhook_manager.py    # Token management, execution log
 │   ├── memory/                   # Persistent long-term memory
 │   │   └── memory_manager.py     # Per-agent JSON store, auto-extraction, prompt injection
+│   ├── telegram/                 # Telegram bot integration
+│   │   ├── telegram_config.py    # Token + allowed user IDs storage
+│   │   └── telegram_bot.py       # PTB v20 async bot, commands, push notifications
+│   ├── notifications/            # In-app notification system
+│   │   └── notification_manager.py  # Persistent store, read/unread, alert keywords
 │   ├── workflow/                 # Workflow engine
 │   ├── analytics/                # Analytics tracking
 │   ├── testing/                  # Agent testing framework
 │   ├── templates/                # Agent templates
 │   ├── data/
 │   │   ├── memory/               # Per-agent memory JSON files
+│   │   ├── notifications.json    # Persistent notification store
+│   │   ├── notification_settings.json
+│   │   ├── telegram_config.json  # Bot token + user IDs (gitignored)
 │   │   └── ...                   # Other runtime data (configs, logs, job store)
 │   └── requirements.txt
 │
@@ -68,6 +78,8 @@ agent-sphere/
     │   │   ├── WebhookManager.jsx    # Webhook UI
     │   │   ├── LLMSettings.jsx       # Multi-LLM config UI
     │   │   ├── MemoryManager.jsx     # Long-term memory UI
+    │   │   ├── TelegramSettings.jsx  # Telegram bot config UI
+    │   │   ├── NotificationCenter.jsx # Bell + dropdown notification panel
     │   │   ├── AgentBuilder.jsx
     │   │   ├── WorkflowBuilder.jsx
     │   │   ├── ToolBuilder.jsx
@@ -75,6 +87,8 @@ agent-sphere/
     │   │   ├── TestRunner.jsx
     │   │   └── TemplateBrowser.jsx
     │   └── App.css
+    ├── public/
+    │   └── sw.js                 # Service worker for background browser push
     └── package.json
 ```
 
@@ -176,8 +190,11 @@ npm start
 | 📊 **Insights** | Analytics and testing |
 | 🧠 **LLM** | Provider config, API keys, failover order |
 | 🧩 **Memory** | View, add, and delete per-agent long-term memories |
+| ✈️ **Telegram** | Bot token config, user allow-list, enable/disable, commands reference |
 
 **UI Themes:** 🟢 Matrix · 🔵 Cyber · 🟣 Classic
+
+**Notification bell 🔔** — right-aligned in the nav bar; shows unread badge and opens the notification center panel.
 
 ---
 
@@ -415,6 +432,129 @@ GET  /api/memory/agents
 ### Storage
 
 Memories are stored as JSON in `agent-sphere-system/data/memory/<agent_id>.json`. The file is human-readable and can be edited directly if needed.
+
+---
+
+## ✈️ Telegram Integration
+
+Chat with your agents from anywhere using Telegram. Scheduled job results are pushed directly to your phone as messages.
+
+### Setup
+
+1. Message **@BotFather** in Telegram → `/newbot` → copy the token.
+2. Open the **✈️ Telegram** tab in the UI.
+3. Paste the token, add your Telegram user ID to the allow-list, enable the bot, and click **Save**.
+4. Send `/myid` to the bot to find your user ID if you don't know it.
+
+```bash
+# Or configure via API
+curl -X POST http://localhost:5000/api/telegram/config \
+  -H "Content-Type: application/json" \
+  -d '{
+    "bot_token": "7123456789:AAF...",
+    "enabled": true,
+    "allowed_user_ids": [98765432],
+    "notify_on_schedule": true
+  }'
+```
+
+### Bot commands
+
+| Command | Action |
+|---|---|
+| `/ask <message>` | Chat with the smart orchestrator |
+| `/ask home <message>` | Talk to the home assistant agent |
+| `/ask calendar <message>` | Talk to the calendar / email agent |
+| `/ask finance <message>` | Talk to the finance agent |
+| `/ask <custom_agent> <message>` | Talk to any custom agent by ID |
+| `/agents` | List all available agents |
+| `/schedules` | View active scheduled jobs |
+| `/status` | Server and agent health check |
+| `/myid` | Show your Telegram user ID for allow-listing |
+| `/help` | Full command reference |
+
+Any plain message (no slash command) goes straight to the orchestrator.
+
+### Security
+
+The bot only responds to Telegram user IDs listed in `allowed_user_ids`. Leave the list empty to allow anyone (not recommended for public bots). Config is stored in `data/telegram_config.json` — this file is gitignored.
+
+### Scheduled job push
+
+When `notify_on_schedule` is enabled, every scheduled job result is automatically pushed to Telegram:
+
+```
+✅ Scheduled job: Daily briefing
+Agent: orchestrator
+
+Good morning! Here's your update: ...
+```
+
+---
+
+## 🔔 Notifications & Alerting
+
+A persistent notification center tracks events across all channels. The **🔔 bell** in the nav bar shows an unread badge and opens the panel.
+
+### Notification sources
+
+| Source | When it fires |
+|---|---|
+| **Scheduler** | Every scheduled job completion or failure |
+| **Webhook** | Every external HTTP trigger |
+| **Agent** | Alert keyword found in any agent response |
+| **Finance** | Monthly spend exceeds configured threshold |
+| **Manual** | `POST /api/notifications` |
+
+### Alert keywords
+
+Whenever an agent response contains a configured keyword (default: `error`, `failed`, `critical`, `alert`, `down`, `offline`), a warning notification is automatically created. Configure keywords in the bell → **Settings** panel or via API:
+
+```bash
+curl -X POST http://localhost:5000/api/notifications/settings \
+  -H "Content-Type: application/json" \
+  -d '{
+    "alert_keywords": ["error", "failed", "critical", "alert", "down", "offline"],
+    "budget_threshold": 1000.0,
+    "notify_on_schedule_success": true,
+    "notify_on_schedule_failure": true,
+    "notify_on_webhook": true,
+    "notify_on_keyword_match": true
+  }'
+```
+
+### Notification API
+
+```bash
+# List notifications (newest first)
+GET  /api/notifications?limit=50&unread_only=false
+
+# Get unread count
+GET  /api/notifications/unread-count
+
+# Mark one read
+POST /api/notifications/<id>/read
+
+# Mark all read
+POST /api/notifications/read-all
+
+# Clear all
+DELETE /api/notifications
+
+# Create manually
+POST /api/notifications
+{ "title": "...", "message": "...", "type": "info|success|warning|error", "source": "manual" }
+```
+
+### Browser push (background tab)
+
+1. Click bell → **Settings** → enable **Browser Push**.
+2. Allow the browser permission prompt.
+3. Notifications are now delivered even when the Agent Sphere tab is closed, via a service worker (`public/sw.js`).
+
+### Persistence
+
+Notifications survive server restarts — stored in `data/notifications.json` (capped at 200 entries, oldest pruned first).
 
 ---
 
@@ -1030,6 +1170,7 @@ POST /api/workflows/execute
 - `token.json` — Google access/refresh tokens
 - `.env` — Home Assistant tokens
 - `data/llm_config.json` — Cloud LLM API keys
+- `data/telegram_config.json` — Telegram bot token + user IDs
 
 All are already in `.gitignore`.
 
@@ -1231,6 +1372,8 @@ React components are in `agent-sphere-ui/src/components/`
 - `WebhookManager.jsx` - Webhook management UI
 - `LLMSettings.jsx` - Multi-LLM configuration UI
 - `MemoryManager.jsx` - Long-term memory browser and editor
+- `TelegramSettings.jsx` - Telegram bot config, user ID allow-list, test button
+- `NotificationCenter.jsx` - Bell icon with unread badge, dropdown panel, alert settings
 - `AnalyticsDashboard.jsx` - Analytics dashboard
 - `TestRunner.jsx` - Testing interface
 - `TemplateBrowser.jsx` - Agent templates
@@ -1295,11 +1438,17 @@ python -c "from agents.home_agent import home_agent; \
 11. Configure multi-LLM failover for reliability
 12. Use `/remember` in chat to build up persistent agent memory
 
+**Connect & Notify:**
+13. Set up Telegram bot to chat with agents from your phone
+14. Configure notification alert keywords for critical events
+15. Enable browser push for background notifications
+16. Connect scheduled job results to Telegram push
+
 **Monitor & Optimize:**
-12. Track agent performance in Analytics
-13. Set up automated testing for quality assurance
-14. Monitor usage patterns and optimize
-15. Export reports and share insights
+17. Track agent performance in Analytics
+18. Set up automated testing for quality assurance
+19. Monitor usage patterns and optimize
+20. Export reports and share insights
 
 **Advanced:**
 16. Extend with additional API integrations

@@ -44,6 +44,15 @@ from llm.llm_config import llm_config, PROVIDERS
 from llm.llm_router import llm_router
 from webhook.webhook_manager import webhook_manager
 from memory.memory_manager import memory_manager
+from telegram.telegram_config import telegram_config
+from notifications.notification_manager import notification_manager
+from telegram.telegram_bot import (
+    set_handlers as tg_set_handlers,
+    start_bot as tg_start_bot,
+    stop_bot as tg_stop_bot,
+    is_running as tg_is_running,
+    push_message as tg_push_message,
+)
 
 
 # Initialize Flask app
@@ -77,7 +86,6 @@ conversations = {
 
 # Store active connections
 active_connections = []
-notification_history = []
 
 # Load Whisper model once at startup (change 'base' to 'small', 'medium', 'large' for better accuracy)
 whisper_model = whisper.load_model("base")
@@ -119,6 +127,40 @@ def broadcast_update(event_type, data):
 # Start the scheduler now that broadcast_update is defined
 scheduler_engine.set_broadcast(broadcast_update)
 scheduler_engine.start()
+
+# Wire notification broadcast
+notification_manager.set_broadcast(broadcast_update)
+
+# ── Telegram bot wiring ───────────────────────────────────────────────────────
+
+def _tg_execute_query(query: str, agent_id: str, session_key: str) -> str:
+    """Blocking helper used by the Telegram bot to run queries against the backend."""
+    import requests as _requests
+    try:
+        resp = _requests.post(
+            "http://localhost:5000/api/orchestrator/execute",
+            json={"query": query, "agent_id": agent_id, "session_key": session_key},
+            timeout=120,
+        )
+        data = resp.json()
+        return data.get("execution", {}).get("final_response", str(data))
+    except Exception as e:
+        return f"Error reaching backend: {e}"
+
+
+def _tg_get_agents():
+    agents = list(workflow_engine.agents.values())
+    result = [{"id": a.name, "role": a.role} for a in agents]
+    for ca in custom_agent_manager.list_agents():
+        result.append({"id": ca.get("id"), "role": ca.get("role", "Custom agent")})
+    return result
+
+
+def _tg_get_schedules():
+    return scheduler_engine.list_jobs()
+
+
+tg_set_handlers(_tg_execute_query, _tg_get_agents, _tg_get_schedules)
 
 # ============================================================================
 # HEALTH & STATUS ENDPOINTS
@@ -724,28 +766,86 @@ def create_from_template(template_id):
 
 @app.route('/api/notifications', methods=['GET'])
 def get_notifications():
-    limit = request.args.get('limit', 20, type=int)
-    return jsonify({"notifications": notification_history[-limit:]}), 200
+    limit = request.args.get('limit', 50, type=int)
+    unread_only = request.args.get('unread_only', 'false').lower() == 'true'
+    notifs = notification_manager.get_all(limit=limit, unread_only=unread_only)
+    return jsonify({
+        "notifications": notifs,
+        "unread_count": notification_manager.unread_count(),
+    }), 200
+
 
 @app.route('/api/notifications', methods=['POST'])
 def create_notification():
     try:
         data = request.json
-        notification = {
-            'id': len(notification_history) + 1,
-            'title': data.get('title'),
-            'message': data.get('message'),
-            'type': data.get('type', 'info'),
-            'timestamp': datetime.now().isoformat()
-        }
-        notification_history.append(notification)
-        
-        broadcast_update('notification', notification)
-        
-        return jsonify(notification), 201
+        notif = notification_manager.add(
+            title=data.get('title', 'Notification'),
+            message=data.get('message', ''),
+            notif_type=data.get('type', 'info'),
+            source=data.get('source', 'manual'),
+            agent_id=data.get('agent_id', ''),
+        )
+        return jsonify(notif), 201
     except Exception as e:
         logger.error(f"Error creating notification: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/notifications/unread-count', methods=['GET'])
+def get_unread_count():
+    return jsonify({"unread_count": notification_manager.unread_count()}), 200
+
+
+@app.route('/api/notifications/<notif_id>/read', methods=['POST'])
+def mark_notification_read(notif_id):
+    found = notification_manager.mark_read(notif_id)
+    return jsonify({"success": found, "unread_count": notification_manager.unread_count()}), 200
+
+
+@app.route('/api/notifications/read-all', methods=['POST'])
+def mark_all_notifications_read():
+    notification_manager.mark_all_read()
+    return jsonify({"success": True, "unread_count": 0}), 200
+
+
+@app.route('/api/notifications', methods=['DELETE'])
+def clear_notifications():
+    notification_manager.clear_all()
+    return jsonify({"success": True}), 200
+
+
+@app.route('/api/notifications/settings', methods=['GET'])
+def get_notification_settings():
+    s = notification_manager.get_settings()
+    s.pop('push_subscriptions', None)
+    return jsonify(s), 200
+
+
+@app.route('/api/notifications/settings', methods=['POST'])
+def update_notification_settings():
+    data = request.json or {}
+    updated = notification_manager.update_settings(data)
+    updated.pop('push_subscriptions', None)
+    return jsonify({"success": True, "settings": updated}), 200
+
+
+@app.route('/api/notifications/subscribe', methods=['POST'])
+def push_subscribe():
+    """Save a Web Push subscription from the browser service worker."""
+    sub = request.json or {}
+    if not sub.get('endpoint'):
+        return jsonify({"error": "endpoint required"}), 400
+    notification_manager.add_push_subscription(sub)
+    return jsonify({"success": True}), 200
+
+
+@app.route('/api/notifications/unsubscribe', methods=['POST'])
+def push_unsubscribe():
+    endpoint = (request.json or {}).get('endpoint', '')
+    notification_manager.remove_push_subscription(endpoint)
+    return jsonify({"success": True}), 200
+
 
 # ============================================================================
 # WHISPER SPEECH-TO-TEXT ENDPOINT
@@ -942,6 +1042,17 @@ def execute_orchestrated_query():
             threading.Thread(
                 target=memory_manager.extract_and_store,
                 args=(agent_id, query, execution_result["final_response"]),
+                daemon=True,
+            ).start()
+        except Exception:
+            pass
+
+        # Check agent response for alert keywords (non-blocking)
+        try:
+            agent_id = data.get('agent_id', 'orchestrator')
+            threading.Thread(
+                target=notification_manager.check_response_for_alerts,
+                args=(execution_result["final_response"], agent_id),
                 daemon=True,
             ).start()
         except Exception:
@@ -2236,6 +2347,14 @@ def trigger_webhook(token):
         duration_ms=duration_ms,
     )
 
+    # In-app notification for webhook trigger
+    notification_manager.notify_webhook_trigger(
+        webhook_name=hook['name'],
+        agent_id=hook.get('agent_id', 'orchestrator'),
+        result=result_text,
+        success=success,
+    )
+
     status_code = 200 if success else 500
     return jsonify({
         "success": success,
@@ -2310,6 +2429,65 @@ def clear_memories(agent_id):
 
 
 # ============================================================================
+# TELEGRAM ENDPOINTS
+# ============================================================================
+
+@app.route('/api/telegram/config', methods=['GET'])
+def tg_get_config():
+    """Return Telegram config (token masked)."""
+    cfg = telegram_config.get()
+    if cfg.get("bot_token"):
+        cfg["bot_token"] = cfg["bot_token"][:6] + "…" + cfg["bot_token"][-4:]
+    cfg["is_running"] = tg_is_running()
+    return jsonify(cfg), 200
+
+
+@app.route('/api/telegram/config', methods=['POST'])
+def tg_update_config():
+    """Save Telegram config and (re)start bot if enabled."""
+    data = request.json or {}
+    telegram_config.update(data)
+    # Restart bot if token/enabled changed
+    from telegram.telegram_bot import _bot_thread
+    if telegram_config.enabled:
+        if not tg_is_running():
+            tg_start_bot()
+    else:
+        tg_stop_bot()
+    cfg = telegram_config.get()
+    if cfg.get("bot_token"):
+        cfg["bot_token"] = cfg["bot_token"][:6] + "…" + cfg["bot_token"][-4:]
+    cfg["is_running"] = tg_is_running()
+    return jsonify({"success": True, "config": cfg}), 200
+
+
+@app.route('/api/telegram/test', methods=['POST'])
+def tg_test():
+    """Send a test message to all allowed users."""
+    if not tg_is_running():
+        return jsonify({"success": False, "error": "Bot is not running. Check token and enable it first."}), 400
+    tg_push_message("👋 Test message from Agent Sphere — your Telegram integration is working!")
+    return jsonify({"success": True, "message": "Test message sent."}), 200
+
+
+@app.route('/api/telegram/start', methods=['POST'])
+def tg_start():
+    """Start the bot (uses current saved config)."""
+    telegram_config._load()   # reload in case file changed
+    if not telegram_config.bot_token:
+        return jsonify({"success": False, "error": "No bot token configured."}), 400
+    tg_start_bot()
+    return jsonify({"success": True, "is_running": tg_is_running()}), 200
+
+
+@app.route('/api/telegram/stop', methods=['POST'])
+def tg_stop():
+    """Stop the running bot."""
+    tg_stop_bot()
+    return jsonify({"success": True, "is_running": False}), 200
+
+
+# ============================================================================
 # ERROR HANDLERS
 # ============================================================================
 
@@ -2328,6 +2506,10 @@ def server_error(error):
 if __name__ == '__main__':
     import atexit
     atexit.register(scheduler_engine.shutdown)
+    atexit.register(tg_stop_bot)
+
+    # Start Telegram bot (no-op if disabled or token not set)
+    tg_start_bot()
 
     print("\n" + "=" * 70)
     print("  MULTI-AGENT AI SYSTEM - FLASK API SERVER WITH WEBSOCKET")
@@ -2335,6 +2517,10 @@ if __name__ == '__main__':
     print("\n✅ Server starting on http://localhost:5000")
     print("✅ WebSocket available for real-time updates")
     print("✅ Scheduler running (cron jobs active)")
+    if tg_is_running():
+        print("✅ Telegram bot running")
+    else:
+        print("ℹ️  Telegram bot disabled (configure in UI → Telegram tab)")
     print("\n📚 API Documentation:")
     print("   Health: GET /api/health")
     print("   Status: GET /api/status")

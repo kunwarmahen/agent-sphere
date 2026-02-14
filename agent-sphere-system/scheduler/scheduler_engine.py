@@ -80,6 +80,22 @@ def execute_scheduled_job(job_id: str) -> None:
         except Exception:
             pass
 
+    # Push result to Telegram (non-blocking; no-op if bot is disabled)
+    try:
+        from telegram.telegram_bot import push_schedule_result
+        agent_id = meta.get("agent_id", "orchestrator")
+        push_schedule_result(job_name, agent_id, result, success)
+    except Exception:
+        pass
+
+    # Persist in-app notification
+    try:
+        from notifications.notification_manager import notification_manager
+        agent_id = meta.get("agent_id", "orchestrator")
+        notification_manager.notify_schedule_result(job_name, agent_id, result, success)
+    except Exception:
+        pass
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 
